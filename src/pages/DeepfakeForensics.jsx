@@ -56,7 +56,7 @@ const DeepfakeForensics = () => {
 
         // Placeholder — will be replaced with real API call
         const steps = [
-            { msg: 'Uploading to DeepShield-X engine...', pct: 15 },
+            { msg: 'Uploading to Deepfake Forensics engine...', pct: 15 },
             { msg: 'Extracting face regions (RetinaFace)...', pct: 30 },
             { msg: 'Spatial analysis (DINOv2 + LoRA)...', pct: 50 },
             { msg: 'Frequency domain analysis (FFT)...', pct: 65 },
@@ -79,7 +79,7 @@ const DeepfakeForensics = () => {
                         verdict: 'PENDING',
                         confidence: 0,
                         manipulation_score: 0,
-                        message: 'DeepShield-X model not yet connected. Train and deploy the model first.',
+                        message: 'Deepfake Forensics model not yet connected. Train and deploy the model first.',
                         file_name: file.name,
                         file_size: (file.size / 1024).toFixed(1) + ' KB',
                         file_type: file.type.startsWith('video/') ? 'Video' : 'Image',
@@ -101,7 +101,7 @@ const DeepfakeForensics = () => {
     return (
         <div className="deepfake-container">
             <div className="df-header">
-                <h1>DeepShield-X Forensics Engine</h1>
+                <h1>Deepfake Forensics Engine</h1>
                 <p>Multi-stream deepfake detection: Spatial + Frequency + Attention + Temporal analysis</p>
             </div>
 
@@ -151,7 +151,7 @@ const DeepfakeForensics = () => {
                         <p>{file.name} — {(file.size / 1024).toFixed(1)} KB</p>
                     </div>
                     <div className="action-buttons">
-                        <button className="analyze-btn" onClick={analyzeFile}>🔍 Analyze with DeepShield-X</button>
+                        <button className="analyze-btn" onClick={analyzeFile}>🔍 Analyze</button>
                         <button className="reset-btn" onClick={reset}>Cancel</button>
                     </div>
                 </div>
@@ -180,7 +180,7 @@ const DeepfakeForensics = () => {
             {!analyzing && results && (
                 <div className="df-results">
                     <div className={`verdict-banner ${results.verdict === 'MANIPULATED' ? 'fake' :
-                            results.verdict === 'PENDING' ? 'pending' : 'real'
+                        results.verdict === 'PENDING' ? 'pending' : 'real'
                         }`}>
                         <div className="verdict-icon">
                             {results.verdict === 'MANIPULATED' ? '⚠️' :
