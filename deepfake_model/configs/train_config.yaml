@@ -1,0 +1,75 @@
+# Deepfake Forensics — Training Configuration
+
+# Model
+model:
+  backbone: "facebook/dinov2-base"
+  lora_r: 8
+  lora_alpha: 16
+  lora_dropout: 0.1
+  embed_dim: 512
+  num_region_queries: 4  # eyes, mouth, jaw, hair
+
+# Temporal (video)
+temporal:
+  enabled: false  # set true for video training
+  num_layers: 4
+  num_heads: 8
+  max_frames: 32
+
+# Data
+data:
+  face_size: 256
+  min_face_score: 0.7
+  frame_sample_count: 16
+  batch_size: 32
+  num_workers: 4
+
+# Training
+training:
+  epochs: 25
+  optimizer: "adamw"
+  lr_lora: 5e-4
+  lr_new: 1e-3
+  weight_decay: 1e-4
+  scheduler: "cosine_warm_restarts"
+  warmup_epochs: 2
+  fp16: true
+  gradient_clip: 1.0
+
+# Loss weights
+loss:
+  bce_weight: 1.0
+  focal_weight: 0.5
+  focal_gamma: 2.0
+  triplet_weight: 0.5
+  triplet_margin: 0.3
+  quality_weight: 0.1
+
+# Curriculum training
+curriculum:
+  easy_epochs: 8     # epochs 1-8: easy samples only
+  mixed_epochs: 10   # epochs 9-18: mixed difficulty
+  chaos_epochs: 7    # epochs 19-25: full chaos augmentation
+
+# Augmentation
+augmentation:
+  jpeg_quality_range: [30, 95]
+  blur_sigma_range: [0.0, 3.0]
+  noise_sigma_range: [0.0, 15.0]
+  resize_range: [0.5, 1.5]
+  color_jitter: 0.3
+  horizontal_flip: 0.5
+  pixel_dropout: 0.02
+
+# Paths (update these for your environment)
+paths:
+  data_root: "./data"
+  checkpoint_dir: "./checkpoints"
+  log_dir: "./logs"
+
+# Evaluation
+eval:
+  val_ratio: 0.15
+  test_ratio: 0.1
+  metrics: ["auc", "accuracy", "f1", "eer"]
+  save_best_metric: "auc"
