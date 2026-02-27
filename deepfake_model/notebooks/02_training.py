@@ -79,11 +79,11 @@ CONFIG = {
     'lr_new': 1e-3,
     'weight_decay': 1e-4,
 
-    # Loss weights
+    # Loss weights (Phase 1: BCE + Focal only)
     'bce_weight': 1.0,
     'focal_weight': 0.5,
-    'triplet_weight': 0.5,
-    'quality_weight': 0.1,
+    'triplet_weight': 0.0,    # Phase 3: set to 0.5
+    'quality_weight': 0.0,    # Phase 3: set to 0.1
 
     # Curriculum schedule
     'easy_end': 8,             # Epochs 1-8: easy phase
@@ -249,7 +249,6 @@ def train_one_epoch(model, loader, criterion, optimizer, scaler, epoch, config):
             'loss': f"{loss.item():.4f}",
             'bce': f"{loss_dict['bce']:.3f}",
             'focal': f"{loss_dict['focal']:.3f}",
-            'triplet': f"{loss_dict['triplet']:.3f}",
         })
 
     avg_loss = total_loss / len(loader)

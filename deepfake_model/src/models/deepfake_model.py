@@ -1,9 +1,12 @@
 """
 Deepfake Forensics — Full Model Assembly.
 
-Combines all streams (spatial, frequency, attention), adaptive fusion,
+Combines all streams (spatial, frequency, attention), fusion,
 optional temporal transformer (video), and classification + metric heads
 into a single end-to-end model.
+
+Phase 1: Uses SimpleFusion (concat + MLP)
+Phase 3: Can upgrade to AdaptiveFusionEngine (quality-weighted)
 """
 
 import torch
@@ -12,7 +15,7 @@ import torch.nn as nn
 from .spatial_stream import SpatialStream
 from .frequency_stream import FrequencyStream
 from .attention_stream import AttentionForgeryStream
-from .adaptive_fusion import AdaptiveFusionEngine
+from .adaptive_fusion import SimpleFusion, AdaptiveFusionEngine
 from .temporal_module import TemporalTransformer
 from .heads import ClassificationHead, MetricHead
 
@@ -25,9 +28,15 @@ class DeepfakeForensicsModel(nn.Module):
     Video mode:  (B, T, 3, 256, 256) → prediction
 
     Returns dict with: logits, probability, embedding, attention maps, quality estimates.
+
+    Args:
+        video_mode: if True, includes temporal transformer for video
+        use_adaptive_fusion: if True, uses Phase 3 quality-weighted fusion
+                             if False (default), uses Phase 1 simple MLP fusion
     """
 
-    def __init__(self, video_mode=False, lora_r=8, lora_alpha=16, embed_dim=512):
+    def __init__(self, video_mode=False, use_adaptive_fusion=False,
+                 lora_r=8, lora_alpha=16, embed_dim=512):
         super().__init__()
 
         self.video_mode = video_mode
@@ -37,8 +46,11 @@ class DeepfakeForensicsModel(nn.Module):
         self.frequency = FrequencyStream(embed_dim=embed_dim)
         self.attention = AttentionForgeryStream(embed_dim=embed_dim)
 
-        # Quality-adaptive fusion
-        self.fusion = AdaptiveFusionEngine(dim=embed_dim)
+        # Fusion: SimpleFusion (Phase 1) or AdaptiveFusionEngine (Phase 3)
+        if use_adaptive_fusion:
+            self.fusion = AdaptiveFusionEngine(dim=embed_dim)
+        else:
+            self.fusion = SimpleFusion(dim=embed_dim)
 
         # Temporal module (video only)
         self.temporal = TemporalTransformer(dim=embed_dim) if video_mode else None

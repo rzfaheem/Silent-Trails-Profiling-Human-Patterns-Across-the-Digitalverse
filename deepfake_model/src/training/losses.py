@@ -1,7 +1,8 @@
 """
 Loss Functions — Compound loss for deepfake detection.
 
-Total Loss = BCE + Focal + Triplet + Quality MSE
+Total Loss = BCE + Focal (Phase 1)
+          + Triplet + Quality MSE (Phase 3, optional)
 
 Each loss targets a different aspect:
 - BCE: basic binary classification
@@ -84,11 +85,12 @@ class CompoundLoss(nn.Module):
     """
     Combined loss for deepfake detection training.
 
-    Total = bce_w * BCE + focal_w * Focal + triplet_w * Triplet + quality_w * QualityMSE
+    Phase 1 default: BCE + Focal only (triplet and quality weights = 0)
+    Phase 3 upgrade: Set triplet_weight=0.5 and quality_weight=0.1
     """
 
     def __init__(self, bce_weight=1.0, focal_weight=0.5, focal_gamma=2.0,
-                 triplet_weight=0.5, triplet_margin=0.3, quality_weight=0.1):
+                 triplet_weight=0.0, triplet_margin=0.3, quality_weight=0.0):
         super().__init__()
 
         self.bce_weight = bce_weight

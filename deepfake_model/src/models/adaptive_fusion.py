@@ -1,17 +1,61 @@
 """
-Adaptive Fusion Engine — Quality-aware stream combination.
+Fusion Engines for combining multi-stream embeddings.
 
-Uses a Quality Estimator module to predict input degradation levels
-(compression, blur, motion), then dynamically weights the three
-streams based on predicted quality.
+Two options:
+- SimpleFusion (Phase 1): Concat + gating MLP. Easy to train, easy to debug.
+- AdaptiveFusionEngine (Phase 3): Quality-aware dynamic weighting.
 
-Example: If image is heavily compressed, reduce frequency stream weight
-(frequency artifacts get destroyed by compression) and increase
-spatial stream weight.
+Phase 1 uses SimpleFusion by default. Upgrade to AdaptiveFusionEngine
+once the core model is validated and stable.
 """
 
 import torch
 import torch.nn as nn
+
+
+class SimpleFusion(nn.Module):
+    """
+    Phase 1 fusion: Concatenate stream embeddings → gating MLP → output.
+
+    Simple and effective. The MLP implicitly learns which streams to trust
+    without needing explicit quality estimation or pseudo-labels.
+
+    Input:  Three stream embeddings (B, dim) each
+    Output: fused (B, dim), quality placeholder (B, 3)
+    """
+
+    def __init__(self, dim=512, dropout=0.2):
+        super().__init__()
+
+        # Gating MLP: 1536 (3×512 concat) → 512
+        self.gate = nn.Sequential(
+            nn.Linear(dim * 3, dim * 2),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim * 2, dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim, dim),
+        )
+
+    def forward(self, h_spatial, h_freq, h_attn):
+        """
+        Args:
+            h_spatial: (B, dim) spatial stream embedding
+            h_freq:    (B, dim) frequency stream embedding
+            h_attn:    (B, dim) attention stream embedding
+
+        Returns:
+            fused:   (B, dim) fused embedding
+            quality: (B, 3) placeholder zeros (no quality estimation in Phase 1)
+        """
+        combined = torch.cat([h_spatial, h_freq, h_attn], dim=-1)  # (B, dim*3)
+        fused = self.gate(combined)  # (B, dim)
+
+        # Return dummy quality to keep API compatible with AdaptiveFusionEngine
+        quality = torch.zeros(h_spatial.size(0), 3, device=h_spatial.device)
+
+        return fused, quality
 
 
 class QualityEstimator(nn.Module):
