@@ -58,25 +58,49 @@ print(f"PyTorch {torch.__version__} | CUDA: {torch.cuda.is_available()}")
 
 # ════════════════════════════════════════════════════════════════
 # CELL 4 — MOUNT GOOGLE DRIVE + CREATE FOLDERS
-# You will be asked to sign in to Google — do it
+#
+# SPACE STRATEGY (works with 20GB Google Drive):
+#   - FF++ and DeepDetect → /content/ (Colab local, 100GB free, temporary)
+#   - HiDF and CelebDF   → Google Drive (you upload these manually)
+#   - Checkpoints        → Google Drive (CRITICAL — must survive disconnects)
+#
+# This way your Drive only needs ~5-8 GB, not 20+ GB.
 # ════════════════════════════════════════════════════════════════
 """
 from google.colab import drive
 drive.mount('/content/drive')
 
 import os
-BASE   = '/content/drive/MyDrive/SilentTrails'
-DATA   = f'{BASE}/data'
-CKPTS  = f'{BASE}/checkpoints'
 
-for ds in ['ff++', 'hidf', 'deepdetect', 'celebdf']:
-    os.makedirs(f'{DATA}/{ds}/real', exist_ok=True)
-    os.makedirs(f'{DATA}/{ds}/fake', exist_ok=True)
+# Google Drive — only for things that MUST persist
+DRIVE_BASE = '/content/drive/MyDrive/SilentTrails'
+CKPTS = f'{DRIVE_BASE}/checkpoints'
+DRIVE_DATA = f'{DRIVE_BASE}/data'
+
+# Create Drive folders for HiDF, CelebDF, and checkpoints
+for ds in ['hidf', 'celebdf']:
+    os.makedirs(f'{DRIVE_DATA}/{ds}/real', exist_ok=True)
+    os.makedirs(f'{DRIVE_DATA}/{ds}/fake', exist_ok=True)
 os.makedirs(CKPTS, exist_ok=True)
 
-print("Google Drive mounted!")
-print(f"Data folder:       {DATA}")
-print(f"Checkpoint folder: {CKPTS}")
+# Colab local storage — for large datasets (FF++ and DeepDetect)
+# These are temporary (lost on disconnect) but we re-download from Kaggle
+LOCAL_DATA = '/content/data'
+for ds in ['ff++', 'deepdetect']:
+    os.makedirs(f'{LOCAL_DATA}/{ds}/real', exist_ok=True)
+    os.makedirs(f'{LOCAL_DATA}/{ds}/fake', exist_ok=True)
+
+# Combined data root that train.py will use
+# We create symlinks so train.py sees everything under one /content/data/ folder
+os.symlink(f'{DRIVE_DATA}/hidf',   f'{LOCAL_DATA}/hidf',   target_is_directory=True)
+os.symlink(f'{DRIVE_DATA}/celebdf', f'{LOCAL_DATA}/celebdf', target_is_directory=True)
+
+DATA = LOCAL_DATA  # This is what we pass to train.py
+
+print("Setup complete!")
+print(f"Large datasets (FF++, DeepDetect) → {LOCAL_DATA}  (Colab local, free)")
+print(f"HiDF + CelebDF                    → {DRIVE_DATA}  (Google Drive)")
+print(f"Checkpoints                        → {CKPTS}  (Google Drive, persists)")
 """
 
 
@@ -139,10 +163,12 @@ else:
 """
 import os
 
-FFPP_DOWNLOAD = '/content/ffpp_raw'
+# Downloads to Colab local storage (NOT Google Drive)
+# Colab has ~100GB local free — no Drive space used
+FFPP_DOWNLOAD = '/content/data/ff++_raw'
 os.makedirs(FFPP_DOWNLOAD, exist_ok=True)
 
-print("Downloading FF++ from Kaggle (14.36 GB)...")
+print("Downloading FF++ from Kaggle (14.36 GB) to Colab local storage...")
 print("This takes 10-15 minutes. Do not interrupt.")
 !kaggle datasets download -d adhamelmy/faceforencis-extracted-frames -p {FFPP_DOWNLOAD} --unzip
 
@@ -165,27 +191,27 @@ print("This takes 10-15 minutes. Do not interrupt.")
 """
 import os, shutil
 
-DATA   = '/content/drive/MyDrive/SilentTrails/data'
-FFPP_RAW = '/content/ffpp_raw'
+# FF++ already downloaded to /content/data/ff++_raw
+# We just move it into the right place under /content/data/ff++/
+import os
+FFPP_RAW  = '/content/data/ff++_raw'
+FFPP_REAL = '/content/data/ff++/real'
+FFPP_FAKE = '/content/data/ff++/fake'
+os.makedirs(FFPP_REAL, exist_ok=True)
+os.makedirs(FFPP_FAKE, exist_ok=True)
 
-FFPP_OUT_REAL = f'{DATA}/ff++/real'
-FFPP_OUT_FAKE = f'{DATA}/ff++/fake'
+# Move real frames (no copy — same disk, instant)
+print("Moving real frames...")
+!mv {FFPP_RAW}/real/* {FFPP_REAL}/ 2>/dev/null || cp -r {FFPP_RAW}/real/. {FFPP_REAL}/
 
-os.makedirs(FFPP_OUT_REAL, exist_ok=True)
-os.makedirs(FFPP_OUT_FAKE, exist_ok=True)
+# Move fake frames (keeps subdirectory structure)
+print("Moving fake frames (Deepfakes, Face2Face, FaceSwap, etc.)...")
+!mv {FFPP_RAW}/fake/* {FFPP_FAKE}/ 2>/dev/null || cp -r {FFPP_RAW}/fake/. {FFPP_FAKE}/
 
-# Copy real frames
-print("Copying real frames to Google Drive...")
-!cp -r {FFPP_RAW}/real/. {FFPP_OUT_REAL}/
-
-# Copy fake frames (all subdirectories)
-print("Copying fake frames to Google Drive...")
-!cp -r {FFPP_RAW}/fake/. {FFPP_OUT_FAKE}/
-
-# Count
-real_count = sum(1 for f in __import__('pathlib').Path(FFPP_OUT_REAL).rglob('*') if f.is_file())
-fake_count = sum(1 for f in __import__('pathlib').Path(FFPP_OUT_FAKE).rglob('*') if f.is_file())
-print(f"FF++ ready: {real_count:,} real + {fake_count:,} fake")
+from pathlib import Path
+real_count = sum(1 for f in Path(FFPP_REAL).rglob('*') if f.is_file())
+fake_count = sum(1 for f in Path(FFPP_FAKE).rglob('*') if f.is_file())
+print(f"FF++ ready: {real_count:,} real + {fake_count:,} fake (all in /content/, NO Drive space used)")
 """
 
 
@@ -203,16 +229,18 @@ print(f"FF++ ready: {real_count:,} real + {fake_count:,} fake")
 """
 import os
 
-DD_DOWNLOAD = '/content/deepdetect_raw'
+# Also goes to Colab local /content/ — no Drive space used
+DD_DOWNLOAD = '/content/data/deepdetect_raw'
 os.makedirs(DD_DOWNLOAD, exist_ok=True)
 
 # ⚠️ REPLACE THIS with the exact Kaggle dataset slug you find
+# Search on kaggle.com for "AI generated faces deepfake 2025"
 DEEPDETECT_SLUG = 'YOUR_USERNAME/deepdetect-2025'
 
 print(f"Downloading DeepDetect-2025: {DEEPDETECT_SLUG}")
 !kaggle datasets download -d {DEEPDETECT_SLUG} -p {DD_DOWNLOAD} --unzip
 
-# Inspect structure
+# Inspect structure so you know what folders exist
 !ls {DD_DOWNLOAD}
 """
 
@@ -227,26 +255,27 @@ print(f"Downloading DeepDetect-2025: {DEEPDETECT_SLUG}")
 import os
 from pathlib import Path
 
-DATA = '/content/drive/MyDrive/SilentTrails/data'
-DD_RAW = '/content/deepdetect_raw'
+# DeepDetect goes to /content/data/deepdetect/ (local, no Drive space)
+DD_RAW  = '/content/data/deepdetect_raw'
+DD_REAL = '/content/data/deepdetect/real'
+DD_FAKE = '/content/data/deepdetect/fake'
+os.makedirs(DD_REAL, exist_ok=True)
+os.makedirs(DD_FAKE, exist_ok=True)
 
-# Show structure so you know what paths to use
+# Show structure so you know what folders exist
 for p in sorted(Path(DD_RAW).iterdir()):
     print(p)
 
-# After you see the structure, adjust these:
-DD_REAL_SRC = f'{DD_RAW}/real'  # Change if different
-DD_FAKE_SRC = f'{DD_RAW}/fake'  # Change if different
+# ⚠️ Adjust these paths based on what you see above
+DD_REAL_SRC = f'{DD_RAW}/real'   # Change if folder has different name
+DD_FAKE_SRC = f'{DD_RAW}/fake'   # Change if folder has different name
 
-os.makedirs(f'{DATA}/deepdetect/real', exist_ok=True)
-os.makedirs(f'{DATA}/deepdetect/fake', exist_ok=True)
+!mv {DD_REAL_SRC}/* {DD_REAL}/ 2>/dev/null || cp -r {DD_REAL_SRC}/. {DD_REAL}/
+!mv {DD_FAKE_SRC}/* {DD_FAKE}/ 2>/dev/null || cp -r {DD_FAKE_SRC}/. {DD_FAKE}/
 
-!cp -r {DD_REAL_SRC}/. {DATA}/deepdetect/real/
-!cp -r {DD_FAKE_SRC}/. {DATA}/deepdetect/fake/
-
-real_count = sum(1 for f in Path(f'{DATA}/deepdetect/real').rglob('*') if f.is_file())
-fake_count = sum(1 for f in Path(f'{DATA}/deepdetect/fake').rglob('*') if f.is_file())
-print(f"DeepDetect ready: {real_count:,} real + {fake_count:,} fake")
+real_count = sum(1 for f in Path(DD_REAL).rglob('*') if f.is_file())
+fake_count = sum(1 for f in Path(DD_FAKE).rglob('*') if f.is_file())
+print(f"DeepDetect ready: {real_count:,} real + {fake_count:,} fake (NO Drive space used)")
 """
 
 
