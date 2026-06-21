@@ -81,32 +81,42 @@ print(f"Checkpoint folder: {CKPTS}")
 
 
 # ════════════════════════════════════════════════════════════════
-# CELL 5 — SETUP KAGGLE API
+# CELL 5 — SETUP KAGGLE API (New Token Format)
 #
-# BEFORE running this cell, you need your kaggle.json file.
-# How to get it:
+# Kaggle now uses a token (KGAT_...) instead of the old JSON file.
+#
+# HOW TO GET YOUR TOKEN:
 #   1. Go to https://www.kaggle.com/settings
 #   2. Scroll to "API" section
-#   3. Click "Create New Token" → downloads kaggle.json
-#   4. Run this cell → a file upload button appears
-#   5. Upload your kaggle.json file
+#   3. Click "Create New Token"
+#   4. Copy the token shown (starts with KGAT_...)
+#   5. Paste it below where it says YOUR_TOKEN_HERE
 # ════════════════════════════════════════════════════════════════
 """
-from google.colab import files
 import os, json
 
-print("Upload your kaggle.json file now...")
-uploaded = files.upload()  # A button appears — click it and upload kaggle.json
+# ⚠️ PASTE YOUR KAGGLE TOKEN HERE (the KGAT_... value)
+KAGGLE_TOKEN = "YOUR_TOKEN_HERE"   # e.g. "KGAT_a072bd400cecd5b7e8353bfa309526e6"
 
-# Install the credentials
-os.makedirs('/root/.kaggle', exist_ok=True)
-with open('/root/.kaggle/kaggle.json', 'w') as f:
-    f.write(list(uploaded.values())[0].decode())
-os.chmod('/root/.kaggle/kaggle.json', 0o600)
+# --- DO NOT EDIT BELOW THIS LINE ---
+if KAGGLE_TOKEN == "YOUR_TOKEN_HERE":
+    print("ERROR: You forgot to paste your Kaggle token above!")
+    print("Replace YOUR_TOKEN_HERE with your actual KGAT_... token")
+else:
+    os.makedirs('/root/.kaggle', exist_ok=True)
+    # New Kaggle API uses token format
+    kaggle_config = {"token": KAGGLE_TOKEN}
+    with open('/root/.kaggle/kaggle.json', 'w') as f:
+        json.dump(kaggle_config, f)
+    os.chmod('/root/.kaggle/kaggle.json', 0o600)
 
-# Verify it works
-!kaggle datasets list --search "faceforensics" 2>&1 | head -5
-print("Kaggle API is ready!")
+    # Also set as environment variable (belt and suspenders)
+    os.environ['KAGGLE_TOKEN'] = KAGGLE_TOKEN
+
+    # Verify it works
+    result = !kaggle datasets list --search "faceforensics" 2>&1
+    print('\n'.join(result[:5]))
+    print("\nKaggle API is ready!")
 """
 
 
