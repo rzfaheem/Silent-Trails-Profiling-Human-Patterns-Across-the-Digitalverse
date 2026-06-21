@@ -10,9 +10,7 @@ const Footer = () => {
                 <p className="footer-subtitle">
                     Profiling Human Patterns Across the Digitalverse
                 </p>
-                <p className="footer-subtitle">
-                    Final Year Project - Academic Prototype
-                </p>
+
                 <p className="footer-copyright">
                     © {currentYear} Silent Trails. For educational purposes only.
                 </p>

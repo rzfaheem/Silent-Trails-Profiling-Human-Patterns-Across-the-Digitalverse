@@ -13,10 +13,6 @@ const Home = () => {
 
                 {/* Content */}
                 <div className="hero-content">
-                    <div className="hero-badge">
-                        <span className="badge-dot"></span>
-                        Academic Prototype
-                    </div>
 
                     <h1 className="hero-title">
                         Silent Trails
@@ -26,12 +22,9 @@ const Home = () => {
                     </p>
 
                     <p className="hero-subtitle">
-                        Advanced threat intelligence and OSINT reconnaissance at your fingertips
+                        An integrated platform for advanced OSINT reconnaissance and deepfake forensics.
                     </p>
 
-                    <Link to="/digital-recon" className="hero-cta">
-                        Launch App
-                    </Link>
                 </div>
             </section>
 
@@ -71,16 +64,7 @@ const Home = () => {
                 </div>
             </section>
 
-            {/* Trust Bar */}
-            <section className="trust-bar">
-                <span>Powered by</span>
-                <div className="trust-logos">
-                    <span>🕷️ SpiderFoot</span>
-                    <span>🔒 VirusTotal</span>
-                    <span>📡 URLhaus</span>
-                    <span>🗄️ Supabase</span>
-                </div>
-            </section>
+
         </div>
     );
 };

@@ -9,6 +9,14 @@ const cors = require('cors');
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
+const FormData = require('form-data');
+
+// Multer — store uploads temporarily in memory (max 200MB for video)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 200 * 1024 * 1024 },
+});
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -512,51 +520,62 @@ app.post('/api/profile-scan', async (req, res) => {
 
         console.log(`[SpiderFoot] Starting scan with name: ${scanName}, target: ${target}, usecase: ${usecase}, typelist: ${typelistStr || '(none)'}`);
 
-        const response = await axios.post(
-            `${SPIDERFOOT_URL}/startscan`,
-            formData.toString(),
-            {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Cookie': cookieString,
-                    'Referer': `${SPIDERFOOT_URL}/newscan`
-                },
-                maxRedirects: 5
-            }
-        );
+        // SpiderFoot startscan returns a 302 redirect — axios may throw on this
+        // We catch it and proceed, because the scan IS created regardless
+        try {
+            await axios.post(
+                `${SPIDERFOOT_URL}/startscan`,
+                formData.toString(),
+                {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Cookie': cookieString,
+                        'Referer': `${SPIDERFOOT_URL}/newscan`
+                    },
+                    maxRedirects: 5,
+                    validateStatus: () => true  // Accept ANY status code
+                }
+            );
+            console.log(`[SpiderFoot] Scan submission completed`);
+        } catch (submitErr) {
+            console.log(`[SpiderFoot] Scan POST returned redirect/error (expected): ${submitErr.message}`);
+            // This is normal — SpiderFoot redirects after scan creation
+        }
 
-        // SpiderFoot returns HTML redirect, wait and retry to get the new scan from list
-        // Sometimes SpiderFoot takes a moment to register the new scan
+        // SpiderFoot takes a moment to register the new scan in its database
+        // Wait and retry to find it in the scan list
         let ourScan = null;
-        let retries = 5;
+        let retries = 8;
 
         while (!ourScan && retries > 0) {
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
 
-            const scanListResponse = await axios.get(`${SPIDERFOOT_URL}/scanlist`);
-            const scans = scanListResponse.data || [];
+            try {
+                const scanListResponse = await axios.get(`${SPIDERFOOT_URL}/scanlist`);
+                const scans = Array.isArray(scanListResponse.data) ? scanListResponse.data : [];
 
-            console.log(`[SpiderFoot] Looking for scan with name: "${scanName}" (retry ${6 - retries}/5)`);
-            console.log(`[SpiderFoot] Scan list has ${scans.length} scans. Names: ${scans.slice(0, 5).map(s => `"${s[1]}"`).join(', ')}`);
+                console.log(`[SpiderFoot] Looking for scan with name: "${scanName}" (retry ${9 - retries}/8)`);
+                console.log(`[SpiderFoot] Scan list has ${scans.length} scans.`);
 
-            // SpiderFoot scan format: [scanId, scanName, target, startTime, endTime, finishTime, status, numResults, riskLevels]
-            // Find our scan by matching the scan name (index 1) which we generated
-            ourScan = scans.find(s => s[1] && s[1] === scanName);
+                // SpiderFoot scan format: [scanId, scanName, target, startTime, endTime, finishTime, status, numResults, riskLevels]
+                // 1) Exact name match
+                ourScan = scans.find(s => s[1] && s[1] === scanName);
 
-            // Also try matching by target if name not found
-            if (!ourScan) {
-                // Try finding the most recent scan for this target
-                ourScan = scans.find(s => s[2] && s[2] === target && s[1]?.startsWith('silenttrails_'));
-            }
-
-            // Last resort: find the newest scan (first in list) that wasn't there before
-            if (!ourScan && scans.length > 0) {
-                const newest = scans[0];
-                console.log(`[SpiderFoot] Trying newest scan: ID=${newest[0]}, Name="${newest[1]}", Target="${newest[2]}"`);
-                // If the newest scan's target matches, use it
-                if (newest[2] === target) {
-                    ourScan = newest;
+                // 2) Match by target with silenttrails prefix
+                if (!ourScan) {
+                    ourScan = scans.find(s => s[2] && s[2] === target && s[1]?.startsWith('silenttrails_'));
                 }
+
+                // 3) Last resort: grab the newest scan whose target matches
+                if (!ourScan && scans.length > 0) {
+                    const newest = scans[0];
+                    console.log(`[SpiderFoot] Trying newest scan: ID=${newest[0]}, Name="${newest[1]}", Target="${newest[2]}"`);
+                    if (newest[2] === target) {
+                        ourScan = newest;
+                    }
+                }
+            } catch (listErr) {
+                console.log(`[SpiderFoot] Error fetching scan list: ${listErr.message}`);
             }
 
             retries--;
@@ -1314,106 +1333,55 @@ app.get('/api/check-leak/:query', async (req, res) => {
 });
 
 
-const multer = require('multer');
-const { spawn } = require('child_process');
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, 'uploads');
-        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        const uniqueName = `df_${Date.now()}_${file.originalname}`;
-        cb(null, uniqueName);
-    }
-});
 
-const upload = multer({
-    storage,
-    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB max
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only image files are allowed'), false);
-        }
-    }
-});
+// ==================== DEEPFAKE DETECTION (prithivMLmods model) ====================
+
+const INFERENCE_SERVER = process.env.INFERENCE_SERVER || 'http://127.0.0.1:8001';
 
 /**
- * Analyze an uploaded image for deepfake/manipulation indicators
- * POST /api/analyze-deepfake
- * Body: multipart/form-data with 'file' field
- * 
- * Pipeline:
- * 1. Upload saved to backend/uploads/
- * 2. Python script runs ELA + EXIF + Noise analysis
- * 3. Returns full forensic report with ELA heatmap
+ * POST /api/deepfake-detect
+ * Accepts: multipart/form-data with field `file` (image or video)
+ * Proxies to Python inference_server.py on port 8001
  */
-/*
-// DEEPFAKE ANALYSIS ENDPOINT (DISABLED PER USER REQUEST - REVERTED TO SIMULATION)
-app.post('/api/analyze-deepfake', upload.single('file'), async (req, res) => {
+app.post('/api/deepfake-detect', upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
+            return res.status(400).json({ error: 'No file uploaded. Send multipart/form-data with field "file".' });
         }
- 
-        const filePath = req.file.path;
-        console.log(`\n[Deepfake] Analyzing: ${req.file.originalname} (${(req.file.size / 1024).toFixed(1)} KB)`);
- 
-        // Spawn Python analyzer
-        const pythonScript = path.join(__dirname, 'deepfake_analyzer.py');
- 
-        const result = await new Promise((resolve, reject) => {
-            const python = spawn('python', [pythonScript, filePath]);
-            let stdout = '';
-            let stderr = '';
- 
-            python.stdout.on('data', (data) => {
-                stdout += data.toString();
-            });
- 
-            python.stderr.on('data', (data) => {
-                stderr += data.toString();
-                // Log progress messages
-                const lines = data.toString().split('\n').filter(l => l.trim());
-                lines.forEach(line => console.log(`  ${line}`));
-            });
- 
-            python.on('close', (code) => {
-                if (code !== 0) {
-                    reject(new Error(`Python exited with code ${code}: ${stderr}`));
-                } else {
-                    try {
-                        resolve(JSON.parse(stdout));
-                    } catch (e) {
-                        reject(new Error(`Failed to parse Python output: ${stdout.substring(0, 200)}`));
-                    }
-                }
-            });
- 
-            // Timeout after 30 seconds
-            setTimeout(() => {
-                python.kill();
-                reject(new Error('Analysis timed out after 30s'));
-            }, 30000);
+
+        console.log(`[Deepfake] Received file: ${req.file.originalname} (${(req.file.size / 1024).toFixed(1)} KB, ${req.file.mimetype})`);
+
+        // Forward the file buffer to the Python inference server
+        const form = new FormData();
+        form.append('file', req.file.buffer, {
+            filename: req.file.originalname,
+            contentType: req.file.mimetype,
         });
- 
-        // Clean up
-        fs.unlink(filePath, () => {});
- 
-        res.json(result);
- 
+
+        const response = await axios.post(`${INFERENCE_SERVER}/detect`, form, {
+            headers: form.getHeaders(),
+            timeout: 120000, // 2 min for large videos
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+        });
+
+        console.log(`[Deepfake] Result: ${response.data.verdict} (${response.data.confidence}% confidence)`);
+        res.json(response.data);
+
     } catch (error) {
-        console.error(`[Deepfake] Error: ${error.message}`);
-        // Clean up
-        if (req.file) fs.unlink(req.file.path, () => {});
-        res.status(500).json({ error: error.message });
+        const detail = error.response?.data?.detail || error.message;
+        console.error('[Deepfake] Error:', detail);
+
+        if (error.code === 'ECONNREFUSED') {
+            return res.status(503).json({
+                error: 'Inference server is not running.',
+                hint: 'Run: python deepfake_model/inference_server.py',
+            });
+        }
+        res.status(500).json({ error: detail });
     }
 });
-*/
 
 app.listen(PORT, '127.0.0.1', () => {
     console.log(`
@@ -1429,6 +1397,7 @@ app.listen(PORT, '127.0.0.1', () => {
 ║     • URLhaus (Malware URL database)                         ║
 ║     • SpiderFoot (200+ OSINT modules)                        ║
 ║     • Supabase (Database + Auth)                             ║
+║     • Deepfake Detect → Python :8001                         ║
 ╚══════════════════════════════════════════════════════════════╝
   `);
 });

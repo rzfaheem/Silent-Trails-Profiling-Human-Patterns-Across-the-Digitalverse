@@ -74,7 +74,7 @@
 }
 
 .tl-tab.active {
-    background: rgba(0, 235, 135, 0.1);
+    background: rgba(6, 182, 212, 0.1);
     border-color: var(--primary);
     color: var(--primary);
 }
@@ -120,8 +120,8 @@
 }
 
 .tl-new-btn:hover {
-    background: #00ff96;
-    box-shadow: 0 0 20px rgba(0, 235, 135, 0.3);
+    background: #22d3ee;
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
 }
 
 /* Empty State */
@@ -175,7 +175,7 @@
 
 .tl-inv-card.selected {
     border-color: var(--primary);
-    box-shadow: 0 0 15px rgba(0, 235, 135, 0.15);
+    box-shadow: 0 0 15px rgba(6, 182, 212, 0.15);
 }
 
 .tl-inv-card-header {
@@ -197,10 +197,11 @@
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
+    font-family: var(--font-mono);
 }
 
 .tl-status.active {
-    background: rgba(0, 235, 135, 0.15);
+    background: rgba(6, 182, 212, 0.15);
     color: var(--primary);
 }
 
@@ -218,6 +219,7 @@
     color: var(--text-secondary);
     font-size: 0.9rem;
     margin-bottom: 8px;
+    font-family: var(--font-mono);
 }
 
 .tl-inv-desc {
@@ -238,6 +240,7 @@
 .tl-inv-date {
     color: var(--text-secondary);
     font-size: 0.8rem;
+    font-family: var(--font-mono);
 }
 
 .tl-delete-btn {
@@ -274,6 +277,7 @@
 .tl-info-target {
     color: var(--text-secondary);
     font-size: 0.85rem;
+    font-family: var(--font-mono);
 }
 
 .tl-info-right {
@@ -301,8 +305,8 @@
 
 .tl-export-btn {
     padding: 8px 16px;
-    background: rgba(0, 235, 135, 0.1);
-    border: 1px solid rgba(0, 235, 135, 0.3);
+    background: rgba(6, 182, 212, 0.1);
+    border: 1px solid rgba(6, 182, 212, 0.3);
     color: var(--primary);
     border-radius: var(--radius-md);
     cursor: pointer;
@@ -311,7 +315,7 @@
 }
 
 .tl-export-btn:hover {
-    background: rgba(0, 235, 135, 0.2);
+    background: rgba(6, 182, 212, 0.2);
 }
 
 .tl-export-btn:disabled {
@@ -365,6 +369,7 @@
     font-size: 2.2rem;
     font-weight: 800;
     line-height: 1;
+    font-family: var(--font-mono);
 }
 
 .tl-risk-label {
@@ -424,6 +429,7 @@
     text-align: center;
     letter-spacing: 0.05em;
     text-transform: uppercase;
+    font-family: var(--font-mono);
 }
 
 .tl-sev-bar-track {
@@ -509,7 +515,7 @@
 /* ==================== INTELLIGENCE SUMMARY ==================== */
 .tl-intel-summary {
     background: var(--surface);
-    border: 1px solid rgba(0, 235, 135, 0.15);
+    border: 1px solid rgba(6, 182, 212, 0.15);
     border-radius: var(--radius-lg);
     padding: 20px;
     margin-bottom: var(--spacing-md);
@@ -524,7 +530,7 @@
     left: 0;
     right: 0;
     height: 2px;
-    background: linear-gradient(90deg, var(--primary), rgba(0, 235, 135, 0.2));
+    background: linear-gradient(90deg, var(--primary), rgba(6, 182, 212, 0.2));
 }
 
 .tl-intel-summary h4 {
@@ -545,7 +551,7 @@
     align-items: center;
     gap: 10px;
     padding: 8px 12px;
-    background: rgba(0, 235, 135, 0.04);
+    background: rgba(6, 182, 212, 0.04);
     border-radius: var(--radius-sm);
     font-size: 0.88rem;
     color: var(--text-primary);
@@ -553,7 +559,7 @@
 }
 
 .tl-intel-item:hover {
-    background: rgba(0, 235, 135, 0.08);
+    background: rgba(6, 182, 212, 0.08);
 }
 
 .tl-intel-bullet {
@@ -627,6 +633,7 @@
     color: var(--text-secondary);
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
     word-break: break-all;
+    font-family: var(--font-mono);
 }
 
 .tl-infra-item:last-child {
@@ -634,7 +641,7 @@
 }
 
 .tl-infra-tree-icon {
-    color: rgba(0, 235, 135, 0.5);
+    color: rgba(6, 182, 212, 0.5);
     font-family: monospace;
     font-size: 0.75rem;
     flex-shrink: 0;
@@ -713,7 +720,7 @@
 
 .tl-filter-search input:focus {
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(0, 235, 135, 0.08);
+    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.08);
 }
 
 .tl-filter-search input::placeholder {
@@ -761,7 +768,7 @@
 }
 
 .tl-filter-chip.active {
-    background: rgba(0, 235, 135, 0.12);
+    background: rgba(6, 182, 212, 0.12);
     border-color: var(--primary);
     color: var(--primary);
 }
@@ -814,7 +821,7 @@
 }
 
 .tl-view-toggle button.active {
-    background: rgba(0, 235, 135, 0.15);
+    background: rgba(6, 182, 212, 0.15);
     color: var(--primary);
 }
 
@@ -872,7 +879,7 @@
 .tl-spinner {
     width: 36px;
     height: 36px;
-    border: 3px solid rgba(0, 235, 135, 0.2);
+    border: 3px solid rgba(6, 182, 212, 0.2);
     border-top-color: var(--primary);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
@@ -903,6 +910,32 @@
     width: 2px;
     background: linear-gradient(to bottom, transparent, var(--primary), transparent);
     transform: translateX(-50%);
+}
+
+.tl-wavy-path {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    transform: translateX(-50%);
+    width: 100px;
+    stroke: var(--primary);
+    stroke-width: 2px;
+    fill: none;
+    z-index: 1;
+    opacity: 0.6;
+}
+
+.tl-wavy-path-animate {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: drawPath 3s ease forwards;
+}
+
+@keyframes drawPath {
+    to {
+        stroke-dashoffset: 0;
+    }
 }
 
 .tl-event {
@@ -948,7 +981,7 @@
 }
 
 .tl-event-card:hover {
-    border-color: rgba(0, 235, 135, 0.3);
+    border-color: rgba(6, 182, 212, 0.3);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
@@ -1011,7 +1044,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    background: rgba(0, 235, 135, 0.05);
+    background: rgba(6, 182, 212, 0.05);
     border-bottom: 1px solid var(--surface-border);
     font-weight: 600;
     color: var(--text-primary);
@@ -1138,7 +1171,7 @@
 .tl-form-group input:focus,
 .tl-form-group textarea:focus {
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(0, 235, 135, 0.1);
+    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
 }
 
 .tl-form-group input::placeholder,
@@ -1180,8 +1213,8 @@
 }
 
 .tl-create-btn:hover {
-    background: #00ff96;
-    box-shadow: 0 0 20px rgba(0, 235, 135, 0.3);
+    background: #22d3ee;
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
 }
 
 .tl-create-btn:disabled {

@@ -652,3 +652,214 @@
         transform: translateY(0);
     }
 }
+
+/* ===================== RESULT GRID & CARDS ===================== */
+.result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.result-card {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+}
+
+.result-card h3 {
+    font-size: 0.95rem;
+    color: #a855f7;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+    margin-bottom: var(--spacing-md);
+}
+
+/* ===================== PREVIEW SECTION ===================== */
+.preview-section {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+}
+
+.preview-section h3 {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-md);
+}
+
+.evidence-preview {
+    max-width: 100%;
+    max-height: 360px;
+    border-radius: var(--radius-md);
+    display: block;
+    margin: 0 auto;
+    object-fit: contain;
+}
+
+/* ===================== DF PREVIEW STAGE ===================== */
+.df-preview-stage {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    margin-top: var(--spacing-xl);
+}
+
+.action-buttons {
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: center;
+    margin-top: var(--spacing-lg);
+}
+
+.analyze-btn {
+    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    color: white;
+    border: none;
+    padding: 12px 32px;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+}
+
+.analyze-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(168, 85, 247, 0.6);
+}
+
+/* ===================== FRAME TIMELINE ===================== */
+.frame-timeline {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.frame-card {
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 2px solid;
+    transition: transform 0.2s;
+    cursor: default;
+    min-width: 80px;
+}
+
+.frame-card:hover {
+    transform: scale(1.05);
+}
+
+.frame-card.frame-suspicious {
+    border-color: #f97316;
+    box-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
+}
+
+.frame-card.frame-clean {
+    border-color: rgba(6, 182, 212, 0.3);
+}
+
+.frame-thumb {
+    width: 100%;
+    height: 60px;
+    object-fit: cover;
+    display: block;
+}
+
+.frame-label {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 6px;
+    font-size: 0.7rem;
+    background: rgba(0,0,0,0.5);
+    color: var(--text-secondary);
+}
+
+/* Verdict colour variants */
+.verdict-banner.fake {
+    border-color: rgba(249, 115, 22, 0.5);
+    background: rgba(249, 115, 22, 0.08);
+}
+.verdict-banner.suspicious {
+    border-color: rgba(245, 158, 11, 0.5);
+    background: rgba(245, 158, 11, 0.08);
+}
+.verdict-banner.suspicious .verdict-info h2 {
+    color: #f59e0b;
+}
+.verdict-banner.real {
+    border-color: rgba(34, 197, 94, 0.5);
+    background: rgba(34, 197, 94, 0.06);
+}
+.verdict-banner.pending {
+    border-color: rgba(148, 163, 184, 0.3);
+    background: rgba(148, 163, 184, 0.05);
+}
+
+@media (max-width: 768px) {
+    .result-grid {
+        grid-template-columns: 1fr;
+    }
+    .frame-timeline {
+        gap: 6px;
+    }
+    .frame-card {
+        min-width: 60px;
+    }
+    .frame-thumb {
+        height: 45px;
+    }
+}
+
+/* ==================== LIGHT THEME OVERRIDES ==================== */
+[data-theme='light'] .df-header h1 {
+    background: linear-gradient(to right, #000, #a855f7);
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+
+[data-theme='light'] .df-upload-zone {
+    background: rgba(168, 85, 247, 0.05);
+}
+
+[data-theme='light'] .df-upload-zone:hover,
+[data-theme='light'] .df-upload-zone.drag-active {
+    background: rgba(168, 85, 247, 0.1);
+}
+
+[data-theme='light'] .verdict-banner {
+    background: #ffffff;
+}
+
+[data-theme='light'] .tab-content,
+[data-theme='light'] .overview-card,
+[data-theme='light'] .score-card {
+    background: #ffffff;
+    border-color: rgba(168, 85, 247, 0.2);
+}
+
+[data-theme='light'] .info-row span:last-child {
+    color: var(--text-primary);
+}
+
+[data-theme='light'] .result-tabs button:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #000;
+}
+
+[data-theme='light'] .ela-panel h4 {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme='light'] .ai-bar-track {
+    background: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .evidence-item.neutral {
+    background: rgba(0, 0, 0, 0.05);
+}

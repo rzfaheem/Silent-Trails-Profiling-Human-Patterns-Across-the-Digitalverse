@@ -124,3 +124,90 @@ def get_anti_shortcut_transforms(face_size=256):
 
         # No normalize/tensor here — applied after main augmentation
     ])
+
+
+def compose_training_transforms(face_size=256):
+    """
+    FULL training pipeline: anti-shortcut preprocessing → training augmentation.
+
+    This is what you should actually use for training.
+    Anti-shortcut runs FIRST to destroy dataset-specific artifacts,
+    then regular augmentation adds robustness.
+
+    Pipeline:
+      1. Resize to fixed resolution (kills resolution shortcuts)
+      2. Random JPEG recompression (kills compression fingerprint shortcuts)
+      3. CLAHE color normalization (kills camera/dataset color shortcuts)
+      4. Regular training augmentation (flip, jitter, blur, noise, etc.)
+      5. Normalize + convert to tensor
+    """
+    return A.Compose([
+        # ── Anti-shortcut preprocessing (applied first) ──
+        A.Resize(face_size, face_size),
+        A.ImageCompression(quality_lower=60, quality_upper=95, p=0.8),
+        A.CLAHE(clip_limit=2.0, p=0.3),
+
+        # ── Regular training augmentation ──
+        A.HorizontalFlip(p=0.5),
+        A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.1,
+                           rotate_limit=10, p=0.3),
+
+        A.ColorJitter(brightness=0.3, contrast=0.3,
+                      saturation=0.3, hue=0.1, p=0.5),
+        A.RandomBrightnessContrast(brightness_limit=0.2,
+                                   contrast_limit=0.2, p=0.3),
+
+        A.OneOf([
+            A.ImageCompression(quality_lower=30, quality_upper=95, p=1.0),
+            A.GaussianBlur(blur_limit=(3, 7), p=1.0),
+            A.GaussNoise(var_limit=(10, 50), p=1.0),
+        ], p=0.6),
+
+        A.OneOf([
+            A.Downscale(scale_min=0.5, scale_max=0.9, p=1.0),
+        ], p=0.3),
+
+        A.CoarseDropout(max_holes=6, max_height=16, max_width=16,
+                        fill_value=0, p=0.2),
+
+        # ── Normalize + tensor ──
+        A.Normalize(mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225]),
+        ToTensorV2(),
+    ])
+
+
+def compose_chaos_transforms(face_size=256):
+    """
+    FULL chaos pipeline: anti-shortcut preprocessing → chaos augmentation.
+
+    Used in the final curriculum phase (hardest training).
+    """
+    return A.Compose([
+        # ── Anti-shortcut preprocessing ──
+        A.Resize(face_size, face_size),
+        A.ImageCompression(quality_lower=60, quality_upper=95, p=0.8),
+        A.CLAHE(clip_limit=2.0, p=0.3),
+
+        # ── Chaos-level augmentation ──
+        A.HorizontalFlip(p=0.5),
+        A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2,
+                           rotate_limit=15, p=0.5),
+
+        A.ColorJitter(brightness=0.4, contrast=0.4,
+                      saturation=0.4, hue=0.15, p=0.7),
+
+        A.ImageCompression(quality_lower=20, quality_upper=80, p=0.5),
+        A.GaussianBlur(blur_limit=(3, 9), p=0.4),
+        A.GaussNoise(var_limit=(15, 60), p=0.4),
+
+        A.Downscale(scale_min=0.3, scale_max=0.8, p=0.4),
+
+        A.CoarseDropout(max_holes=10, max_height=20, max_width=20,
+                        fill_value=0, p=0.3),
+
+        # ── Normalize + tensor ──
+        A.Normalize(mean=[0.485, 0.456, 0.406],
+                    std=[0.229, 0.224, 0.225]),
+        ToTensorV2(),
+    ])

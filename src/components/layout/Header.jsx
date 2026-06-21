@@ -1,14 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const Header = () => {
     const { user, signOut } = useAuth();
     const navigate = useNavigate();
+    const [theme, setTheme] = useState(localStorage.getItem('st_theme') || 'dark');
 
     const handleSignOut = async () => {
         await signOut();
         navigate('/login');
+    };
+
+    const toggleTheme = () => {
+        const newTheme = theme === 'dark' ? 'light' : 'dark';
+        setTheme(newTheme);
+        localStorage.setItem('st_theme', newTheme);
+        document.documentElement.setAttribute('data-theme', newTheme);
     };
 
     return (
@@ -37,9 +45,14 @@ const Header = () => {
                         Timeline
                     </NavLink>
                     {user && (
-                        <button onClick={handleSignOut} className="header-signout">
-                            Sign Out
-                        </button>
+                        <>
+                            <button onClick={toggleTheme} className="header-theme-toggle" style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-primary)', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', marginLeft: '16px', marginRight: '8px' }}>
+                                {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+                            </button>
+                            <button onClick={handleSignOut} className="header-signout">
+                                Sign Out
+                            </button>
+                        </>
                     )}
                 </nav>
             </div>

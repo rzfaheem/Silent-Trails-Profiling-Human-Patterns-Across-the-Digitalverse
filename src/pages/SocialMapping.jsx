@@ -61,10 +61,10 @@ const SocialMapping = () => {
     };
 
     const PRESET_CATEGORIES = [
-        { id: 'all', label: 'All', icon: '🔍', desc: 'Complete deep scan — all modules', speed: 'Slowest' },
+        { id: 'all', label: 'All', icon: '🔍', desc: 'Complete deep scan all modules', speed: 'Slowest' },
         { id: 'footprint', label: 'Footprint', icon: '👣', desc: 'What info is exposed online', speed: 'Medium' },
         { id: 'investigate', label: 'Investigate', icon: '🔬', desc: 'Deep dive on suspicious targets', speed: 'Medium' },
-        { id: 'passive', label: 'Passive', icon: '🕵️', desc: 'Stealth — no direct contact', speed: 'Fastest' }
+        { id: 'passive', label: 'Passive', icon: '🕵️', desc: 'Stealth no direct contact', speed: 'Fastest' }
     ];
 
     // Core scan state — restored from sessionStorage on mount
@@ -91,6 +91,21 @@ const SocialMapping = () => {
     const [newInvName, setNewInvName] = useState('');
     const [savingToTimeline, setSavingToTimeline] = useState(false);
     const [savedToTimeline, setSavedToTimeline] = useState(false);
+
+    // Collapsible Categories
+    const [expandedCategories, setExpandedCategories] = useState({
+        accounts: true,
+        domains: true,
+        ipAddresses: true,
+        infrastructure: true,
+        geoNetwork: true,
+        leaks: true,
+        other: false
+    });
+
+    const toggleCategory = (category) => {
+        setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] }));
+    };
 
     // ========== Persist key state to sessionStorage ==========
     useEffect(() => { saveSession('target', target); }, [target]);
@@ -189,13 +204,9 @@ const SocialMapping = () => {
     // ========== INVESTIGATIONS ==========
     const fetchInvestigations = async () => {
         try {
-            const { data, error } = await supabase
-                .from('investigations')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
-            if (error) throw error;
-            setInvestigations(data || []);
+            // DEMO FALLBACK: Load from localStorage since DB is offline
+            const localData = JSON.parse(localStorage.getItem('st_investigations') || '[]');
+            setInvestigations(localData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
         } catch (err) {
             console.error('Failed to fetch investigations:', err);
         }
@@ -204,19 +215,23 @@ const SocialMapping = () => {
     const createQuickInvestigation = async () => {
         if (!newInvName.trim()) return;
         try {
-            const { data, error } = await supabase
-                .from('investigations')
-                .insert({
-                    user_id: user.id,
-                    name: newInvName.trim(),
-                    target: target.trim() || newInvName.trim(),
-                    description: 'Created from Digital Recon scan'
-                })
-                .select()
-                .single();
-            if (error) throw error;
-            setInvestigations(prev => [data, ...prev]);
-            setSelectedInvestigation(data.id);
+            // DEMO FALLBACK: Save to localStorage since DB is offline
+            const newInv = {
+                id: Date.now().toString(),
+                user_id: user?.id || 'demo_user',
+                name: newInvName.trim(),
+                target: target.trim() || newInvName.trim(),
+                description: 'Created from Digital Recon scan',
+                created_at: new Date().toISOString(),
+                status: 'ACTIVE'
+            };
+            
+            const localData = JSON.parse(localStorage.getItem('st_investigations') || '[]');
+            const updatedData = [newInv, ...localData];
+            localStorage.setItem('st_investigations', JSON.stringify(updatedData));
+            
+            setInvestigations(updatedData);
+            setSelectedInvestigation(newInv.id);
             setShowNewInv(false);
             setNewInvName('');
         } catch (err) {
@@ -234,37 +249,65 @@ const SocialMapping = () => {
         try {
             setSavingToTimeline(true);
 
-            // Get session token for authentication
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-
-            if (!token) {
-                throw new Error('User session expired. Please login again.');
+            // DEMO FALLBACK: Save events to localStorage directly
+            const newEvents = [];
+            
+            if (type === 'phishing' || scanResults?.phishing || scanResults?.isPhishing !== undefined) {
+                const isPhishing = scanResults?.phishing?.isPhishing || scanResults?.isPhishing;
+                newEvents.push({
+                    id: Date.now().toString() + '1',
+                    title: `URL Scanned: ${scanTarget}`,
+                    event_type: 'security',
+                    severity: isPhishing ? 'critical' : 'info',
+                    timestamp: new Date().toISOString(),
+                    source: 'VirusTotal'
+                });
+            }
+            
+            if (type === 'manual' || scanResults?.success !== undefined) {
+                if (scanResults?.success && scanResults?.sources?.length > 0) {
+                    newEvents.push({
+                        id: Date.now().toString() + '2',
+                        title: `Email Leaks Found for ${scanTarget}`,
+                        event_type: 'identity',
+                        severity: 'high',
+                        timestamp: new Date().toISOString(),
+                        source: 'LeakCheck'
+                    });
+                }
+            }
+            
+            if (type === 'spiderfoot' || scanResults?.findings) {
+                const f = scanResults.findings;
+                let c = 0;
+                
+                if (f.domains) {
+                    f.domains.forEach(d => {
+                        newEvents.push({ id: Date.now().toString() + 'd' + c++, title: `Domain Found: ${d.data}`, event_type: 'infrastructure', severity: 'info', timestamp: new Date().toISOString(), source: 'SpiderFoot' });
+                    });
+                }
+                if (f.ipAddresses) {
+                    f.ipAddresses.forEach(ip => {
+                        newEvents.push({ id: Date.now().toString() + 'ip' + c++, title: `IP Resolved: ${ip.data}`, event_type: 'infrastructure', severity: 'info', timestamp: new Date().toISOString(), source: 'SpiderFoot' });
+                    });
+                }
+                if (f.accounts) {
+                    f.accounts.forEach(acc => {
+                        newEvents.push({ id: Date.now().toString() + 'acc' + c++, title: `Account Linked: ${acc.data} on ${acc.type}`, event_type: 'identity', severity: 'low', timestamp: new Date().toISOString(), source: 'SpiderFoot' });
+                    });
+                }
+                if (f.leaks) {
+                    f.leaks.forEach(leak => {
+                        newEvents.push({ id: Date.now().toString() + 'lk' + c++, title: `Leak Indicator: ${leak.data}`, event_type: 'security', severity: 'high', timestamp: new Date().toISOString(), source: 'SpiderFoot' });
+                    });
+                }
             }
 
-            const response = await fetch(`${BACKEND_URL}/api/save-scan`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    investigationId: selectedInvestigation,
-                    scanType: type,
-                    target: scanTarget,
-                    results: scanResults,
-                    userId: user.id
-                })
-            });
+            const localEvents = JSON.parse(localStorage.getItem(`st_events_${selectedInvestigation}`) || '[]');
+            localStorage.setItem(`st_events_${selectedInvestigation}`, JSON.stringify([...localEvents, ...newEvents]));
 
-            const data = await response.json();
-
-            if (data.success) {
-                setSavedToTimeline(true);
-                setTimeout(() => setSavedToTimeline(false), 5000);
-            } else {
-                throw new Error(data.message || data.error || 'Save failed');
-            }
+            setSavedToTimeline(true);
+            setTimeout(() => setSavedToTimeline(false), 5000);
         } catch (err) {
             console.error('Failed to save to timeline:', err);
             setError(err.message || 'Failed to save to timeline. Use the Sync button to retry.');
@@ -392,7 +435,7 @@ const SocialMapping = () => {
             if (!response.ok) return;
             const data = await response.json();
             const status = data.status || 'RUNNING';
-            setScanStatus(status);
+            setScanStatus(prev => prev === 'ABORTED' ? 'ABORTED' : status);
 
             // Fetch intermediate results for real-time updates
             if (status === 'RUNNING' || status === 'STARTING') {
@@ -439,14 +482,13 @@ const SocialMapping = () => {
     const stopScan = async () => {
         if (!scanId) return;
         try {
-            const response = await fetch(`${BACKEND_URL}/api/profile-scan/${scanId}/stop`, { method: 'POST' });
-            const data = await response.json();
-            if (data.success) {
-                setScanStatus('ABORTED');
-                setLoading(false);
-                if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-                fetchPreviousScans();
-            }
+            // Immediately stop polling locally to prevent race conditions
+            setScanStatus('ABORTED');
+            setLoading(false);
+            if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+
+            await fetch(`${BACKEND_URL}/api/profile-scan/${scanId}/stop`, { method: 'POST' });
+            fetchPreviousScans();
         } catch (err) {
             console.error('Failed to stop scan:', err);
         }
@@ -502,7 +544,7 @@ const SocialMapping = () => {
                 <div className="sf-logo">🔍</div>
                 <div className="sf-title">
                     <h1>Digital Recon</h1>
-                    <p>Advanced OSINT Reconnaissance · Powered by SpiderFoot</p>
+                    <p>Advanced OSINT Reconnaissance</p>
                 </div>
             </div>
 
@@ -585,8 +627,6 @@ const SocialMapping = () => {
                                 <span className="sf-hint"><strong>📧 Email:</strong> john@example.com</span>
                                 <span className="sf-hint"><strong>🌐 Domain:</strong> example.com</span>
                                 <span className="sf-hint"><strong>🔢 IPv4:</strong> 1.2.3.4</span>
-                                <span className="sf-hint"><strong>👤 Name:</strong> "John Smith" <em>(in quotes)</em></span>
-                                <span className="sf-hint"><strong>🏷️ Username:</strong> "jsmith2000" <em>(in quotes)</em></span>
                             </div>
                         </div>
                     </div>
@@ -890,15 +930,20 @@ const SocialMapping = () => {
                         {/* Accounts on External Sites */}
                         {results.findings?.accounts?.length > 0 && (
                             <div className="sf-category accounts">
-                                <h3>👤 Accounts on External Sites</h3>
-                                <div className="sf-items">
-                                    {results.findings.accounts.map((item, i) => (
-                                        <div key={i} className="sf-item">
-                                            <span className="sf-item-type">{item.type}</span>
-                                            <span className="sf-item-data">{item.data}</span>
-                                        </div>
-                                    ))}
-                                </div>
+                                <h3 className="collapsible-header" onClick={() => toggleCategory('accounts')}>
+                                    <span>👤 Accounts on External Sites</span>
+                                    <span className={`collapsible-icon ${expandedCategories.accounts ? 'open' : ''}`}>▼</span>
+                                </h3>
+                                {expandedCategories.accounts && (
+                                    <div className="sf-items">
+                                        {results.findings.accounts.map((item, i) => (
+                                            <div key={i} className="sf-item">
+                                                <span className="sf-item-type">{item.type}</span>
+                                                <span className="sf-item-data">{item.data}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -907,53 +952,71 @@ const SocialMapping = () => {
                         {/* Domains & Internet Names */}
                         {results.findings?.domains?.length > 0 && (
                             <div className="sf-category">
-                                <h3>🌐 Domains & Internet Names</h3>
-                                <div className="sf-items">
-                                    {results.findings.domains.map((item, i) => (
-                                        <div key={i} className="sf-item">
-                                            <span className="sf-item-type">{item.type}</span>
-                                            <span className="sf-item-data">{item.data}</span>
-                                        </div>
-                                    ))}
-                                </div>
+                                <h3 className="collapsible-header" onClick={() => toggleCategory('domains')}>
+                                    <span>🌐 Domains & Internet Names</span>
+                                    <span className={`collapsible-icon ${expandedCategories.domains ? 'open' : ''}`}>▼</span>
+                                </h3>
+                                {expandedCategories.domains && (
+                                    <div className="sf-items">
+                                        {results.findings.domains.map((item, i) => (
+                                            <div key={i} className="sf-item">
+                                                <span className="sf-item-type">{item.type}</span>
+                                                <span className="sf-item-data">{item.data}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {/* IP Addresses */}
                         {results.findings?.ipAddresses?.length > 0 && (
                             <div className="sf-category">
-                                <h3>🔢 IP Addresses</h3>
-                                <div className="sf-items">
-                                    {results.findings.ipAddresses.map((item, i) => (
-                                        <div key={i} className="sf-item">
-                                            <span className="sf-item-type">{item.type}</span>
-                                            <span className="sf-item-data">{item.data}</span>
-                                        </div>
-                                    ))}
-                                </div>
+                                <h3 className="collapsible-header" onClick={() => toggleCategory('ipAddresses')}>
+                                    <span>🔢 IP Addresses</span>
+                                    <span className={`collapsible-icon ${expandedCategories.ipAddresses ? 'open' : ''}`}>▼</span>
+                                </h3>
+                                {expandedCategories.ipAddresses && (
+                                    <div className="sf-items">
+                                        {results.findings.ipAddresses.map((item, i) => (
+                                            <div key={i} className="sf-item">
+                                                <span className="sf-item-type">{item.type}</span>
+                                                <span className="sf-item-data">{item.data}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {/* Infrastructure */}
                         {results.findings?.infrastructure?.length > 0 && (
                             <div className="sf-category">
-                                <h3>🖥️ Infrastructure</h3>
-                                <div className="sf-items">
-                                    {results.findings.infrastructure.map((item, i) => (
-                                        <div key={i} className="sf-item">
-                                            <span className="sf-item-type">{item.type}</span>
-                                            <span className="sf-item-data">{item.data}</span>
-                                        </div>
-                                    ))}
-                                </div>
+                                <h3 className="collapsible-header" onClick={() => toggleCategory('infrastructure')}>
+                                    <span>🖥️ Infrastructure</span>
+                                    <span className={`collapsible-icon ${expandedCategories.infrastructure ? 'open' : ''}`}>▼</span>
+                                </h3>
+                                {expandedCategories.infrastructure && (
+                                    <div className="sf-items">
+                                        {results.findings.infrastructure.map((item, i) => (
+                                            <div key={i} className="sf-item">
+                                                <span className="sf-item-type">{item.type}</span>
+                                                <span className="sf-item-data">{item.data}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {/* Geo & Network Intelligence */}
                         {results.findings?.geoNetwork?.length > 0 && (
                             <div className="sf-category geo-network">
-                                <h3>🌍 Geo & Network Intelligence</h3>
-                                {results.findings.geoNetwork.map((item, i) => (
+                                <h3 className="collapsible-header" onClick={() => toggleCategory('geoNetwork')}>
+                                    <span>🌍 Geo & Network Intelligence</span>
+                                    <span className={`collapsible-icon ${expandedCategories.geoNetwork ? 'open' : ''}`}>▼</span>
+                                </h3>
+                                {expandedCategories.geoNetwork && results.findings.geoNetwork.map((item, i) => (
                                     <div key={i} className="sf-geo-card">
                                         {/* Location & Network Row */}
                                         {(item.city || item.country) && (
@@ -1011,35 +1074,45 @@ const SocialMapping = () => {
                         )}
                         {results.findings?.leaks?.length > 0 && (
                             <div className="sf-category danger">
-                                <h3>⚠️ Data Leaks & Breaches</h3>
-                                <div className="sf-items">
-                                    {results.findings.leaks.map((item, i) => (
-                                        <div key={i} className="sf-item danger">
-                                            <span className="sf-item-type">{item.type}</span>
-                                            <span className="sf-item-data">{item.data}</span>
-                                        </div>
-                                    ))}
-                                </div>
+                                <h3 className="collapsible-header" onClick={() => toggleCategory('leaks')}>
+                                    <span>⚠️ Data Leaks & Breaches</span>
+                                    <span className={`collapsible-icon ${expandedCategories.leaks ? 'open' : ''}`}>▼</span>
+                                </h3>
+                                {expandedCategories.leaks && (
+                                    <div className="sf-items">
+                                        {results.findings.leaks.map((item, i) => (
+                                            <div key={i} className="sf-item danger">
+                                                <span className="sf-item-type">{item.type}</span>
+                                                <span className="sf-item-data">{item.data}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {/* Other Findings */}
                         {results.findings?.other?.length > 0 && (
                             <div className="sf-category other">
-                                <h3>📋 Other Findings</h3>
-                                <div className="sf-items">
-                                    {results.findings.other.slice(0, 30).map((item, i) => (
-                                        <div key={i} className="sf-item">
-                                            <span className="sf-item-type">{item.type}</span>
-                                            <span className="sf-item-data">{item.data}</span>
-                                        </div>
-                                    ))}
-                                    {results.findings.other.length > 30 && (
-                                        <div className="sf-more">
-                                            +{results.findings.other.length - 30} more findings
-                                        </div>
-                                    )}
-                                </div>
+                                <h3 className="collapsible-header" onClick={() => toggleCategory('other')}>
+                                    <span>📋 Other Findings</span>
+                                    <span className={`collapsible-icon ${expandedCategories.other ? 'open' : ''}`}>▼</span>
+                                </h3>
+                                {expandedCategories.other && (
+                                    <div className="sf-items">
+                                        {results.findings.other.slice(0, 30).map((item, i) => (
+                                            <div key={i} className="sf-item">
+                                                <span className="sf-item-type">{item.type}</span>
+                                                <span className="sf-item-data">{item.data}</span>
+                                            </div>
+                                        ))}
+                                        {results.findings.other.length > 30 && (
+                                            <div className="sf-more">
+                                                +{results.findings.other.length - 30} more findings
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
 

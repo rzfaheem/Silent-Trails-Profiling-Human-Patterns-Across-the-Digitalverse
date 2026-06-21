@@ -47,47 +47,74 @@ const DeepfakeForensics = () => {
         setAnalyzing(true);
         setProgress(0);
         setResults(null);
+        setError(null);
 
-        // TODO: Connect to DeepShield-X API when model is deployed
-        // const formData = new FormData();
-        // formData.append('file', file);
-        // const response = await fetch('http://localhost:8000/detect', { method: 'POST', body: formData });
-        // const data = await response.json();
+        const isVideo = file.type.startsWith('video/');
+        const steps = isVideo
+            ? [
+                { msg: 'Uploading video to Forensics engine...', pct: 10 },
+                { msg: 'Extracting frames from video...', pct: 25 },
+                { msg: 'Running face detection per frame...', pct: 45 },
+                { msg: 'Spatial analysis (SigLIP2 Vision Model)...', pct: 60 },
+                { msg: 'Temporal pattern analysis...', pct: 78 },
+                { msg: 'Aggregating frame-level verdicts...', pct: 90 },
+                { msg: 'Generating forensic report...', pct: 97 },
+            ]
+            : [
+                { msg: 'Uploading image to Forensics engine...', pct: 15 },
+                { msg: 'Running face detection...', pct: 35 },
+                { msg: 'Spatial analysis (SigLIP2 Vision Model)...', pct: 60 },
+                { msg: 'Attention forgery localization...', pct: 82 },
+                { msg: 'Generating forensic verdict...', pct: 97 },
+            ];
 
-        // Placeholder — will be replaced with real API call
-        const steps = [
-            { msg: 'Uploading to Deepfake Forensics engine...', pct: 15 },
-            { msg: 'Extracting face regions (RetinaFace)...', pct: 30 },
-            { msg: 'Spatial analysis (DINOv2 + LoRA)...', pct: 50 },
-            { msg: 'Frequency domain analysis (FFT)...', pct: 65 },
-            { msg: 'Attention forgery localization...', pct: 80 },
-            { msg: 'Generating forensic verdict...', pct: 95 },
-        ];
-
+        // Animate steps while the real request is in-flight
         let stepIdx = 0;
         const interval = setInterval(() => {
             if (stepIdx < steps.length) {
                 setCurrentStep(steps[stepIdx].msg);
                 setProgress(steps[stepIdx].pct);
                 stepIdx++;
-            } else {
-                clearInterval(interval);
-                setProgress(100);
-                setCurrentStep('Analysis Complete');
-                setTimeout(() => {
-                    setResults({
-                        verdict: 'PENDING',
-                        confidence: 0,
-                        manipulation_score: 0,
-                        message: 'Deepfake Forensics model not yet connected. Train and deploy the model first.',
-                        file_name: file.name,
-                        file_size: (file.size / 1024).toFixed(1) + ' KB',
-                        file_type: file.type.startsWith('video/') ? 'Video' : 'Image',
-                    });
-                    setAnalyzing(false);
-                }, 500);
             }
-        }, 600);
+        }, isVideo ? 2500 : 1200);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('http://localhost:5000/api/deepfake-detect', {
+                method: 'POST',
+                body: formData,
+            });
+
+            clearInterval(interval);
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || errData.hint || `Server error ${response.status}`);
+            }
+
+            const data = await response.json();
+            setProgress(100);
+            setCurrentStep('Analysis Complete');
+
+            setTimeout(() => {
+                setResults({
+                    ...data,
+                    file_name: file.name,
+                    file_size: (file.size / 1024).toFixed(1) + ' KB',
+                    file_type: isVideo ? 'Video' : 'Image',
+                    message: null,
+                });
+                setAnalyzing(false);
+            }, 400);
+
+        } catch (err) {
+            clearInterval(interval);
+            setError(`Analysis failed: ${err.message}`);
+            setAnalyzing(false);
+            setProgress(0);
+        }
     };
 
     const reset = () => {
@@ -179,38 +206,106 @@ const DeepfakeForensics = () => {
             {/* RESULTS DASHBOARD */}
             {!analyzing && results && (
                 <div className="df-results">
-                    <div className={`verdict-banner ${results.verdict === 'MANIPULATED' ? 'fake' :
+                    <div className={`verdict-banner ${
+                        results.verdict === 'MANIPULATED' ? 'fake' :
+                        results.verdict === 'SUSPICIOUS' ? 'suspicious' :
                         results.verdict === 'PENDING' ? 'pending' : 'real'
                         }`}>
                         <div className="verdict-icon">
-                            {results.verdict === 'MANIPULATED' ? '⚠️' :
-                                results.verdict === 'PENDING' ? '🔧' : '✅'}
+                            {results.verdict === 'MANIPULATED' ? '🚨' :
+                             results.verdict === 'SUSPICIOUS' ? '⚠️' :
+                             results.verdict === 'PENDING' ? '🔧' : '✅'}
                         </div>
                         <div className="verdict-info">
                             <h2>{results.verdict === 'MANIPULATED' ? 'MANIPULATION DETECTED' :
-                                results.verdict === 'PENDING' ? 'MODEL NOT CONNECTED' : 'LIKELY AUTHENTIC'}</h2>
-                            <p>{results.message || `Confidence: ${results.confidence}% | Score: ${results.manipulation_score}/100`}</p>
+                                 results.verdict === 'SUSPICIOUS' ? 'SUSPICIOUS — POSSIBLE MANIPULATION' :
+                                 results.verdict === 'PENDING' ? 'MODEL NOT CONNECTED' : 'LIKELY AUTHENTIC'}</h2>
+                            <p>
+                                {results.message ||
+                                    `Confidence: ${results.confidence}% | Fake Probability: ${results.fake_probability}%`}
+                            </p>
                         </div>
                     </div>
 
                     <div className="result-grid">
+                        {/* File Info */}
                         <div className="result-card">
                             <h3>File Info</h3>
-                            <div className="info-row"><span>Filename</span> <span>{results.file_name}</span></div>
-                            <div className="info-row"><span>Size</span> <span>{results.file_size}</span></div>
-                            <div className="info-row"><span>Type</span> <span>{results.file_type}</span></div>
+                            <div className="info-row"><span>Filename</span><span>{results.file_name}</span></div>
+                            <div className="info-row"><span>Size</span><span>{results.file_size}</span></div>
+                            <div className="info-row"><span>Type</span><span>{results.file_type}</span></div>
+                            {results.frame_count > 1 && (
+                                <div className="info-row"><span>Frames Analyzed</span><span>{results.frame_count}</span></div>
+                            )}
+                            {results.suspicious_frames != null && (
+                                <div className="info-row"><span>Suspicious Frames</span>
+                                    <span style={{ color: results.suspicious_frames > 0 ? '#f97316' : '#22d3ee' }}>
+                                        {results.suspicious_frames} / {results.frame_count}
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Placeholder cards for future real results */}
+                        {/* Forensic Stream Scores */}
                         <div className="result-card">
-                            <h3>Forensic Analysis</h3>
-                            <div className="info-row"><span>Spatial Score</span> <span>—</span></div>
-                            <div className="info-row"><span>Frequency Score</span> <span>—</span></div>
-                            <div className="info-row"><span>Attention Score</span> <span>—</span></div>
+                            <h3>Stream Analysis</h3>
+                            <div className="info-row">
+                                <span>🧊 Spatial Score</span>
+                                <span>{results.streams?.spatial != null ? `${results.streams.spatial}%` : '—'}</span>
+                            </div>
+                            <div className="info-row">
+                                <span>📊 Frequency Score</span>
+                                <span>{results.streams?.frequency != null ? `${results.streams.frequency}%` : '—'}</span>
+                            </div>
+                            <div className="info-row">
+                                <span>🎯 Attention Score</span>
+                                <span>{results.streams?.attention != null ? `${results.streams.attention}%` : '—'}</span>
+                            </div>
+                            {results.streams?.temporal != null && (
+                                <div className="info-row">
+                                    <span>🎬 Temporal Score</span>
+                                    <span>{results.streams.temporal}%</span>
+                                </div>
+                            )}
+                            <div className="info-row" style={{ marginTop: '8px', borderTop: '1px solid rgba(6,182,212,0.2)', paddingTop: '8px' }}>
+                                <span><strong>Overall Fake Probability</strong></span>
+                                <span style={{ color: results.fake_probability >= 50 ? '#f97316' : '#22d3ee', fontWeight: 700 }}>
+                                    {results.fake_probability}%
+                                </span>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="preview-section">
+                    {/* Video Frame Timeline */}
+                    {results.timeline && results.timeline.length > 0 && (
+                        <div className="result-card" style={{ marginTop: '16px' }}>
+                            <h3>🎬 Frame-by-Frame Timeline</h3>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                                Each frame analyzed independently — red = suspicious
+                            </p>
+                            <div className="frame-timeline">
+                                {results.timeline.map((frame, idx) => (
+                                    <div key={idx} className={`frame-card ${frame.suspicious ? 'frame-suspicious' : 'frame-clean'}`}>
+                                        {frame.thumbnail && (
+                                            <img
+                                                src={`data:image/jpeg;base64,${frame.thumbnail}`}
+                                                alt={`Frame ${frame.frame_index}`}
+                                                className="frame-thumb"
+                                            />
+                                        )}
+                                        <div className="frame-label">
+                                            <span>#{frame.frame_index + 1}</span>
+                                            <span style={{ color: frame.suspicious ? '#f97316' : '#22d3ee', fontWeight: 600 }}>
+                                                {frame.fake_probability}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="preview-section" style={{ marginTop: '16px' }}>
                         <h3>Analyzed File</h3>
                         {file?.type.startsWith('image/') ? (
                             <img src={preview} alt="Evidence" className="evidence-preview" />

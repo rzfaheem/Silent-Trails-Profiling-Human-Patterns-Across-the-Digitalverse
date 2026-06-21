@@ -21,6 +21,18 @@ const Timeline = () => {
     const [filterType, setFilterType] = useState([]); // multi-select
     const [filterSource, setFilterSource] = useState([]); // multi-select
 
+    // ========== UI STATE ==========
+    const [expandedInfra, setExpandedInfra] = useState({
+        domains: false,
+        ipAddresses: false,
+        emails: false,
+        accounts: false
+    });
+    const toggleInfra = (key) => setExpandedInfra(prev => ({ ...prev, [key]: !prev[key] }));
+
+    const [expandedIntel, setExpandedIntel] = useState({});
+    const toggleIntel = (key) => setExpandedIntel(prev => ({ ...prev, [key]: !prev[key] }));
+
     // Fetch user's investigations on mount
     useEffect(() => {
         if (user) fetchInvestigations();
@@ -28,14 +40,9 @@ const Timeline = () => {
 
     const fetchInvestigations = async () => {
         try {
-            const { data, error } = await supabase
-                .from('investigations')
-                .select('*, scans(count)')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            setInvestigations(data || []);
+            // DEMO FALLBACK: Load from localStorage since DB is offline
+            const localData = JSON.parse(localStorage.getItem('st_investigations') || '[]');
+            setInvestigations(localData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
         } catch (err) {
             console.error('Error fetching investigations:', err);
             setError(err.message);
@@ -50,20 +57,22 @@ const Timeline = () => {
 
         try {
             setLoading(true);
-            const { data, error } = await supabase
-                .from('investigations')
-                .insert({
-                    user_id: user.id,
-                    name: newInvestigation.name,
-                    target: newInvestigation.target,
-                    description: newInvestigation.description
-                })
-                .select()
-                .single();
+            // DEMO FALLBACK: Save to localStorage since DB is offline
+            const newInv = {
+                id: Date.now().toString(),
+                user_id: user?.id || 'demo_user',
+                name: newInvestigation.name,
+                target: newInvestigation.target,
+                description: newInvestigation.description,
+                created_at: new Date().toISOString(),
+                status: 'ACTIVE'
+            };
+            
+            const localData = JSON.parse(localStorage.getItem('st_investigations') || '[]');
+            const updatedData = [newInv, ...localData];
+            localStorage.setItem('st_investigations', JSON.stringify(updatedData));
 
-            if (error) throw error;
-
-            setInvestigations(prev => [data, ...prev]);
+            setInvestigations(updatedData);
             setShowNewModal(false);
             setNewInvestigation({ name: '', target: '', description: '' });
             setError(null);
@@ -83,14 +92,10 @@ const Timeline = () => {
     const fetchTimelineEvents = async (investigationId) => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
-                .from('events')
-                .select('*, scans!inner(investigation_id, scan_type, target)')
-                .eq('scans.investigation_id', investigationId)
-                .order('timestamp', { ascending: true, nullsFirst: false });
-
-            if (error) throw error;
-            setEvents(data || []);
+            // DEMO FALLBACK: Load events from localStorage since DB is offline
+            const localEvents = JSON.parse(localStorage.getItem(`st_events_${investigationId}`) || '[]');
+            
+            setEvents(localEvents);
         } catch (err) {
             console.error('Error fetching events:', err);
             setEvents([]);
@@ -104,13 +109,12 @@ const Timeline = () => {
         if (!window.confirm('Delete this investigation and all its data?')) return;
 
         try {
-            const { error } = await supabase
-                .from('investigations')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
-            setInvestigations(prev => prev.filter(inv => inv.id !== id));
+            // DEMO FALLBACK: Delete from localStorage
+            const localData = JSON.parse(localStorage.getItem('st_investigations') || '[]');
+            const updatedData = localData.filter(inv => inv.id !== id);
+            localStorage.setItem('st_investigations', JSON.stringify(updatedData));
+            
+            setInvestigations(updatedData);
             if (selectedInvestigation?.id === id) {
                 setSelectedInvestigation(null);
                 setEvents([]);
@@ -241,12 +245,36 @@ const Timeline = () => {
 
         // Auto-generate intelligence findings
         const findings = [];
-        if (domains.size > 0) findings.push(`${domains.size} linked domain${domains.size > 1 ? 's' : ''} discovered`);
-        if (ipAddresses.size > 0) findings.push(`${ipAddresses.size} IP address${ipAddresses.size > 1 ? 'es' : ''} identified`);
-        if (emails.size > 0) findings.push(`${emails.size} email address${emails.size > 1 ? 'es' : ''} found`);
-        if (accounts.size > 0) findings.push(`${accounts.size} social account${accounts.size > 1 ? 's' : ''} linked`);
-        if (leaks.length > 0) findings.push(`${leaks.length} credential leak${leaks.length > 1 ? 's' : ''} detected`);
-        if (phishingEvents.length > 0) findings.push(`${phishingEvents.length} phishing/malicious indicator${phishingEvents.length > 1 ? 's' : ''} flagged`);
+        if (domains.size > 0) findings.push({
+            type: 'domains',
+            label: `${domains.size} linked domain${domains.size > 1 ? 's' : ''} discovered`,
+            data: Array.from(domains)
+        });
+        if (ipAddresses.size > 0) findings.push({
+            type: 'ipAddresses',
+            label: `${ipAddresses.size} IP address${ipAddresses.size > 1 ? 'es' : ''} identified`,
+            data: Array.from(ipAddresses)
+        });
+        if (emails.size > 0) findings.push({
+            type: 'emails',
+            label: `${emails.size} email address${emails.size > 1 ? 'es' : ''} found`,
+            data: Array.from(emails)
+        });
+        if (accounts.size > 0) findings.push({
+            type: 'accounts',
+            label: `${accounts.size} social account${accounts.size > 1 ? 's' : ''} linked`,
+            data: Array.from(accounts)
+        });
+        if (leaks.length > 0) findings.push({
+            type: 'leaks',
+            label: `${leaks.length} credential leak${leaks.length > 1 ? 's' : ''} detected`,
+            data: leaks.map(l => l.title)
+        });
+        if (phishingEvents.length > 0) findings.push({
+            type: 'phishing',
+            label: `${phishingEvents.length} phishing/malicious indicator${phishingEvents.length > 1 ? 's' : ''} flagged`,
+            data: phishingEvents.map(p => p.title)
+        });
 
         return {
             riskScore,
@@ -608,9 +636,20 @@ const Timeline = () => {
                             <h4>🧠 Intelligence Summary</h4>
                             <div className="tl-intel-findings">
                                 {riskAnalysis.findings.map((finding, i) => (
-                                    <div key={i} className="tl-intel-item">
-                                        <span className="tl-intel-bullet">▸</span>
-                                        <span>{finding}</span>
+                                    <div key={i} className="tl-intel-item-container">
+                                        <div className="tl-intel-item" onClick={() => toggleIntel(finding.type)} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                                            <span className="tl-intel-bullet" style={{ display: 'inline-block', width: '15px' }}>{expandedIntel[finding.type] ? '▼' : '▶'}</span>
+                                            <span>{finding.label}</span>
+                                        </div>
+                                        {expandedIntel[finding.type] && finding.data && finding.data.length > 0 && (
+                                            <div className="tl-intel-sublist" style={{ padding: '8px 0 12px 24px' }}>
+                                                {finding.data.map((item, j) => (
+                                                    <div key={j} style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', padding: '3px 0', borderBottom: '1px solid var(--surface-border)' }}>
+                                                        • {item}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -630,72 +669,80 @@ const Timeline = () => {
                                     {/* Domains */}
                                     {riskAnalysis.infrastructure.domains.length > 0 && (
                                         <div className="tl-infra-section">
-                                            <div className="tl-infra-section-header">
-                                                <span>🔗 Domains</span>
+                                            <div className="tl-infra-section-header" onClick={() => toggleInfra('domains')} style={{ cursor: 'pointer' }}>
+                                                <span>🔗 Domains <span style={{ fontSize: '0.8em', marginLeft: '5px' }}>{expandedInfra.domains ? '▼' : '▶'}</span></span>
                                                 <span className="tl-infra-count">{riskAnalysis.infrastructure.domains.length}</span>
                                             </div>
-                                            <div className="tl-infra-items">
-                                                {riskAnalysis.infrastructure.domains.map((domain, i) => (
-                                                    <div key={i} className="tl-infra-item domain">
-                                                        <span className="tl-infra-tree-icon">├──</span>
-                                                        <span>{domain}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                            {expandedInfra.domains && (
+                                                <div className="tl-infra-items">
+                                                    {riskAnalysis.infrastructure.domains.map((domain, i) => (
+                                                        <div key={i} className="tl-infra-item domain">
+                                                            <span className="tl-infra-tree-icon">├──</span>
+                                                            <span>{domain}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
                                     {/* IP Addresses */}
                                     {riskAnalysis.infrastructure.ipAddresses.length > 0 && (
                                         <div className="tl-infra-section">
-                                            <div className="tl-infra-section-header">
-                                                <span>🖥️ IP Addresses</span>
+                                            <div className="tl-infra-section-header" onClick={() => toggleInfra('ipAddresses')} style={{ cursor: 'pointer' }}>
+                                                <span>🖥️ IP Addresses <span style={{ fontSize: '0.8em', marginLeft: '5px' }}>{expandedInfra.ipAddresses ? '▼' : '▶'}</span></span>
                                                 <span className="tl-infra-count">{riskAnalysis.infrastructure.ipAddresses.length}</span>
                                             </div>
-                                            <div className="tl-infra-items">
-                                                {riskAnalysis.infrastructure.ipAddresses.map((ip, i) => (
-                                                    <div key={i} className="tl-infra-item ip">
-                                                        <span className="tl-infra-dot" style={{ background: '#60a5fa' }} />
-                                                        <span>{ip}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                            {expandedInfra.ipAddresses && (
+                                                <div className="tl-infra-items">
+                                                    {riskAnalysis.infrastructure.ipAddresses.map((ip, i) => (
+                                                        <div key={i} className="tl-infra-item ip">
+                                                            <span className="tl-infra-dot" style={{ background: '#60a5fa' }} />
+                                                            <span>{ip}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
                                     {/* Emails */}
                                     {riskAnalysis.infrastructure.emails.length > 0 && (
                                         <div className="tl-infra-section">
-                                            <div className="tl-infra-section-header">
-                                                <span>📧 Email Addresses</span>
+                                            <div className="tl-infra-section-header" onClick={() => toggleInfra('emails')} style={{ cursor: 'pointer' }}>
+                                                <span>📧 Email Addresses <span style={{ fontSize: '0.8em', marginLeft: '5px' }}>{expandedInfra.emails ? '▼' : '▶'}</span></span>
                                                 <span className="tl-infra-count">{riskAnalysis.infrastructure.emails.length}</span>
                                             </div>
-                                            <div className="tl-infra-items">
-                                                {riskAnalysis.infrastructure.emails.map((email, i) => (
-                                                    <div key={i} className="tl-infra-item email">
-                                                        <span className="tl-infra-dot" style={{ background: '#f59e0b' }} />
-                                                        <span>{email}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                            {expandedInfra.emails && (
+                                                <div className="tl-infra-items">
+                                                    {riskAnalysis.infrastructure.emails.map((email, i) => (
+                                                        <div key={i} className="tl-infra-item email">
+                                                            <span className="tl-infra-dot" style={{ background: '#f59e0b' }} />
+                                                            <span>{email}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
                                     {/* Accounts */}
                                     {riskAnalysis.infrastructure.accounts.length > 0 && (
                                         <div className="tl-infra-section">
-                                            <div className="tl-infra-section-header">
-                                                <span>👤 Linked Accounts</span>
+                                            <div className="tl-infra-section-header" onClick={() => toggleInfra('accounts')} style={{ cursor: 'pointer' }}>
+                                                <span>👤 Linked Accounts <span style={{ fontSize: '0.8em', marginLeft: '5px' }}>{expandedInfra.accounts ? '▼' : '▶'}</span></span>
                                                 <span className="tl-infra-count">{riskAnalysis.infrastructure.accounts.length}</span>
                                             </div>
-                                            <div className="tl-infra-items">
-                                                {riskAnalysis.infrastructure.accounts.map((acct, i) => (
-                                                    <div key={i} className="tl-infra-item account">
-                                                        <span className="tl-infra-dot" style={{ background: '#a78bfa' }} />
-                                                        <span>{acct}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                            {expandedInfra.accounts && (
+                                                <div className="tl-infra-items">
+                                                    {riskAnalysis.infrastructure.accounts.map((acct, i) => (
+                                                        <div key={i} className="tl-infra-item account">
+                                                            <span className="tl-infra-dot" style={{ background: '#a78bfa' }} />
+                                                            <span>{acct}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

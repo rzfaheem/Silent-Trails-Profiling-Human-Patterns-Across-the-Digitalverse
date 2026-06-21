@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -11,6 +11,11 @@ import Timeline from './pages/Timeline';
 import './styles/dashboard.css';
 
 function App() {
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('st_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }, []);
+
   return (
     <Router>
       <Routes>

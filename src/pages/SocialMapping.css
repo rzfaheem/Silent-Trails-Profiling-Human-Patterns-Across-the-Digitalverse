@@ -541,6 +541,29 @@
     border-left: 3px solid var(--primary);
 }
 
+.collapsible-header {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: opacity 0.2s ease;
+}
+
+.collapsible-header:hover {
+    opacity: 0.8;
+}
+
+.collapsible-icon {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    transition: transform 0.3s ease;
+}
+
+.collapsible-icon.open {
+    transform: rotate(180deg);
+}
+
 .sf-category.accounts h3 {
     border-left-color: #60a5fa;
 }
@@ -1131,7 +1154,7 @@
     display: flex;
     gap: 12px;
     padding: 8px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--surface-border);
     align-items: center;
 }
 
@@ -1140,7 +1163,7 @@
 }
 
 .sf-geo-label {
-    color: #94a3b8;
+    color: var(--text-secondary);
     font-size: 0.85rem;
     min-width: 140px;
     flex-shrink: 0;
@@ -1148,14 +1171,14 @@
 }
 
 .sf-geo-value {
-    color: #e2e8f0;
+    color: var(--text-primary);
     font-size: 0.95rem;
     word-break: break-word;
 }
 
 .sf-geo-value.mono {
     font-family: 'Fira Code', 'Cascadia Code', monospace;
-    color: #06b6d4;
+    color: var(--primary);
     background: rgba(6, 182, 212, 0.08);
     padding: 2px 8px;
     border-radius: 4px;
@@ -1190,7 +1213,7 @@
 }
 
 .sf-dns-domain {
-    color: #cbd5e1;
+    color: var(--text-primary);
     font-size: 0.88rem;
     font-family: 'Fira Code', 'Cascadia Code', monospace;
 }
