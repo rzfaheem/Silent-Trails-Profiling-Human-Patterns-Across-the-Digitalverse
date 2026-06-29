@@ -1,6 +1,6 @@
 # Silent Trails: Profiling Human Patterns Across the Digitalverse
 
-> **Final Year Project** — A full-stack OSINT and Digital Forensics Intelligence Platform that combines Open-Source Intelligence (OSINT) gathering, credential breach analysis, deepfake detection, and behavioural pattern analysis.
+> An integrated platform for advanced OSINT reconnaissance and deepfake forensics
 
 ## Overview
 
