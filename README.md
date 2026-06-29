@@ -1,6 +1,6 @@
-# Silent Trails: Profiling Human Patterns Across the Digitalverse
+# Silent Trails
 
-> An integrated platform for advanced OSINT reconnaissance and deepfake forensics
+> Profiling Human Patterns Across the Digitalverse
 
 ## Overview
 
