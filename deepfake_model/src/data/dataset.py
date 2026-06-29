@@ -123,8 +123,13 @@ class DeepfakeDataset(Dataset):
     def __getitem__(self, idx):
         img_path, label, ds_name = self.samples[idx]
 
-        image = Image.open(img_path).convert("RGB")
-        image = np.array(image)
+        try:
+            image = Image.open(img_path).convert("RGB")
+            image = np.array(image)
+        except Exception:
+            # If the image is corrupted, silently load a random different image
+            import random
+            return self.__getitem__(random.randint(0, len(self.samples) - 1))
 
         if self.transform:
             augmented = self.transform(image=image)

@@ -189,7 +189,7 @@ def load_stage1_weights(model, checkpoint_path):
 
     Loads all weights except the temporal transformer (which is new in Stage 2).
     """
-    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
     state_dict = checkpoint['model_state_dict']
 
     # Filter out temporal module weights (they don't exist in Stage 1)
@@ -373,7 +373,7 @@ def main():
 
     if args.resume:
         print(f"\nResuming from: {args.resume}")
-        ckpt = torch.load(args.resume, map_location='cuda')
+        ckpt = torch.load(args.resume, map_location='cuda', weights_only=False)
         model.load_state_dict(ckpt['model_state_dict'])
         optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         scheduler.load_state_dict(ckpt['scheduler_state_dict'])
@@ -447,7 +447,7 @@ def main():
     print(f"{'='*60}")
 
     # Load best model and evaluate on test set
-    best_ckpt = torch.load(os.path.join(args.save_dir, f'stage{args.stage}_best.pth'))
+    best_ckpt = torch.load(os.path.join(args.save_dir, f'stage{args.stage}_best.pth'), weights_only=False)
     model.load_state_dict(best_ckpt['model_state_dict'])
 
     print("\n  Evaluating on test set...")

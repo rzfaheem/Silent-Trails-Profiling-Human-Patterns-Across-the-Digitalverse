@@ -429,6 +429,90 @@ const Timeline = () => {
         URL.revokeObjectURL(url);
     };
 
+    const getDNSIntelligence = (type, value) => {
+        const valLower = value.toLowerCase();
+        
+        if (type === 'MX') {
+            if (valLower.includes('google.com')) return 'Uses Google Workspace (G Suite) for corporate email.';
+            if (valLower.includes('outlook.com') || valLower.includes('protection.outlook.com')) return 'Uses Microsoft Office 365 for corporate email.';
+            if (valLower.includes('zoho.com')) return 'Uses Zoho Mail for corporate email.';
+            if (valLower.includes('protonmail.ch')) return 'Uses secure/encrypted ProtonMail.';
+            return `Mail exchange server points to ${value.split(' ')[1] || value}.`;
+        }
+        
+        if (type === 'NS') {
+            if (valLower.includes('cloudflare.com')) return 'DNS/Traffic routed through Cloudflare (WAF & CDN protection).';
+            if (valLower.includes('awsdns')) return 'Infrastructure hosted on Amazon Web Services (AWS Route 53).';
+            if (valLower.includes('azure')) return 'Infrastructure hosted on Microsoft Azure.';
+            if (valLower.includes('domaincontrol.com')) return 'Domain managed via GoDaddy.';
+            return `Nameservers managed by ${value}.`;
+        }
+        
+        if (type === 'TXT') {
+            if (valLower.includes('v=spf1')) {
+                const senders = [];
+                if (valLower.includes('google.com')) senders.push('Google');
+                if (valLower.includes('outlook.com')) senders.push('Microsoft');
+                if (valLower.includes('mailjet.com')) senders.push('Mailjet');
+                if (valLower.includes('sendgrid.net')) senders.push('SendGrid');
+                if (valLower.includes('mailgun.org')) senders.push('Mailgun');
+                
+                let insight = 'SPF Record: Specifies authorized email senders to prevent spoofing.';
+                if (senders.length > 0) insight += ` Authorized: ${senders.join(', ')}.`;
+                return insight;
+            }
+            if (valLower.includes('facebook-domain-verification')) return 'Verified with Facebook Business Manager (Ads/Analytics).';
+            if (valLower.includes('google-site-verification')) return 'Verified with Google Search Console/Analytics.';
+            if (valLower.includes('apple-domain-verification')) return 'Verified with Apple (Apple Pay / Apple Business).';
+            if (valLower.includes('brevo-code') || valLower.includes('sendinblue')) return 'Uses Brevo (Sendinblue) for email marketing.';
+            if (valLower.includes('docusign')) return 'Verified with DocuSign for e-signatures.';
+            if (valLower.includes('v=DMARC1')) return 'DMARC Policy enabled: High email security against spoofing.';
+            return null;
+        }
+        
+        if (type === 'A') return `Direct IP Resolution: Resolves to IPv4 ${value}.`;
+        if (type === 'CNAME') return `Alias: Traffic is redirected to ${value}.`;
+        
+        return null;
+    };
+
+    const renderDescription = (text) => {
+        if (!text) return null;
+        if (typeof text !== 'string') return <p className="tl-event-desc">{JSON.stringify(text)}</p>;
+        
+        if (text.includes(' IN ')) {
+            const records = text.match(/[a-zA-Z0-9.-]+\.?\s+\d+\s+IN\s+[A-Z]+\s+.*?(?=\s+[a-zA-Z0-9.-]+\.?\s+\d+\s+IN\s+[A-Z]+|$)/g);
+            if (records && records.length > 0) {
+                return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px', marginBottom: '10px', width: '100%' }}>
+                        {records.map((rec, idx) => {
+                            const parts = rec.trim().match(/^([^\s]+)\s+(\d+)\s+IN\s+([A-Z]+)\s+(.+)$/);
+                            if (parts) {
+                                const insight = getDNSIntelligence(parts[3], parts[4]);
+                                return (
+                                    <div key={idx} style={{ background: 'rgba(0,0,0,0.2)', padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                            <span style={{ background: '#0284c7', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.75rem', minWidth: '45px', textAlign: 'center', marginTop: '2px' }}>{parts[3]}</span>
+                                            <span style={{ color: '#e2e8f0', fontFamily: 'monospace', wordBreak: 'break-all', flex: 1 }}>{parts[4]}</span>
+                                            <span style={{ color: '#64748b', fontSize: '0.75rem', whiteSpace: 'nowrap', marginTop: '3px' }}>TTL {parts[2]}</span>
+                                        </div>
+                                        {insight && (
+                                            <div style={{ marginLeft: '55px', color: '#10b981', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span>🧠</span> {insight}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
+                            return <p key={idx} className="tl-event-desc">{rec}</p>;
+                        })}
+                    </div>
+                );
+            }
+        }
+        return <p className="tl-event-desc">{text}</p>;
+    };
+
     // ========== RENDER ==========
     return (
         <div className="timeline-page">
@@ -908,9 +992,7 @@ const Timeline = () => {
                                             </span>
                                         </div>
                                         <h4 className="tl-event-title">{event.title}</h4>
-                                        {event.description && (
-                                            <p className="tl-event-desc">{event.description}</p>
-                                        )}
+                                        {renderDescription(event.description)}
                                         <div className="tl-event-meta">
                                             <span>📡 {event.source}</span>
                                             <span>🎯 {Math.round(event.confidence * 100)}% confidence</span>
@@ -936,9 +1018,12 @@ const Timeline = () => {
                                                 <div className="tl-group-event-severity"
                                                     style={{ background: getSeverityColor(event.severity) }}
                                                 ></div>
-                                                <div className="tl-group-event-info">
-                                                    <span className="tl-group-event-title">{event.title}</span>
-                                                    <span className="tl-group-event-time">{formatDate(event.timestamp)}</span>
+                                                <div className="tl-group-event-info" style={{ width: '100%' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <span className="tl-group-event-title">{event.title}</span>
+                                                        <span className="tl-group-event-time">{formatDate(event.timestamp)}</span>
+                                                    </div>
+                                                    {renderDescription(event.description)}
                                                 </div>
                                                 <span className="tl-group-event-source">{event.source}</span>
                                             </div>

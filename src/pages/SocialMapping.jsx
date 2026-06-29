@@ -17,6 +17,88 @@ const saveSession = (key, val) => {
     try { sessionStorage.setItem(`st_recon_${key}`, JSON.stringify(val)); } catch { }
 };
 
+const getDNSIntelligence = (type, value) => {
+    const valLower = value.toLowerCase();
+    
+    if (type === 'MX') {
+        if (valLower.includes('google.com')) return 'Uses Google Workspace (G Suite) for corporate email.';
+        if (valLower.includes('outlook.com') || valLower.includes('protection.outlook.com')) return 'Uses Microsoft Office 365 for corporate email.';
+        if (valLower.includes('zoho.com')) return 'Uses Zoho Mail for corporate email.';
+        if (valLower.includes('protonmail.ch')) return 'Uses secure/encrypted ProtonMail.';
+        return `Mail exchange server points to ${value.split(' ')[1] || value}.`;
+    }
+    
+    if (type === 'NS') {
+        if (valLower.includes('cloudflare.com')) return 'DNS/Traffic routed through Cloudflare (WAF & CDN protection).';
+        if (valLower.includes('awsdns')) return 'Infrastructure hosted on Amazon Web Services (AWS Route 53).';
+        if (valLower.includes('azure')) return 'Infrastructure hosted on Microsoft Azure.';
+        if (valLower.includes('domaincontrol.com')) return 'Domain managed via GoDaddy.';
+        return `Nameservers managed by ${value}.`;
+    }
+    
+    if (type === 'TXT') {
+        if (valLower.includes('v=spf1')) {
+            const senders = [];
+            if (valLower.includes('google.com')) senders.push('Google');
+            if (valLower.includes('outlook.com')) senders.push('Microsoft');
+            if (valLower.includes('mailjet.com')) senders.push('Mailjet');
+            if (valLower.includes('sendgrid.net')) senders.push('SendGrid');
+            if (valLower.includes('mailgun.org')) senders.push('Mailgun');
+            
+            let insight = 'SPF Record: Specifies authorized email senders to prevent spoofing.';
+            if (senders.length > 0) insight += ` Authorized: ${senders.join(', ')}.`;
+            return insight;
+        }
+        if (valLower.includes('facebook-domain-verification')) return 'Verified with Facebook Business Manager (Ads/Analytics).';
+        if (valLower.includes('google-site-verification')) return 'Verified with Google Search Console/Analytics.';
+        if (valLower.includes('apple-domain-verification')) return 'Verified with Apple (Apple Pay / Apple Business).';
+        if (valLower.includes('brevo-code') || valLower.includes('sendinblue')) return 'Uses Brevo (Sendinblue) for email marketing.';
+        if (valLower.includes('docusign')) return 'Verified with DocuSign for e-signatures.';
+        if (valLower.includes('v=DMARC1')) return 'DMARC Policy enabled: High email security against spoofing.';
+        return null;
+    }
+    
+    if (type === 'A') return `Direct IP Resolution: Resolves to IPv4 ${value}.`;
+    if (type === 'CNAME') return `Alias: Traffic is redirected to ${value}.`;
+    
+    return null;
+};
+
+const renderDecodedData = (dataStr) => {
+    if (!dataStr || typeof dataStr !== 'string') return <span className="sf-geo-value">{dataStr}</span>;
+    if (dataStr.includes(' IN ')) {
+        const records = dataStr.match(/[a-zA-Z0-9.-]+\.?\s+\d+\s+IN\s+[A-Z]+\s+.*?(?=\s+[a-zA-Z0-9.-]+\.?\s+\d+\s+IN\s+[A-Z]+|$)/g);
+        if (records && records.length > 0) {
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px', width: '100%' }}>
+                    {records.map((rec, idx) => {
+                        const parts = rec.trim().match(/^([^\s]+)\s+(\d+)\s+IN\s+([A-Z]+)\s+(.+)$/);
+                        if (parts) {
+                            const insight = getDNSIntelligence(parts[3], parts[4]);
+                            return (
+                                <div key={idx} style={{ background: 'rgba(0,0,0,0.2)', padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', gap: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                        <span style={{ background: '#0284c7', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.75rem', minWidth: '45px', textAlign: 'center', marginTop: '2px' }}>{parts[3]}</span>
+                                        <span style={{ color: '#e2e8f0', fontFamily: 'monospace', wordBreak: 'break-all', flex: 1 }}>{parts[4]}</span>
+                                        <span style={{ color: '#64748b', fontSize: '0.75rem', whiteSpace: 'nowrap', marginTop: '3px' }}>TTL {parts[2]}</span>
+                                    </div>
+                                    {insight && (
+                                        <div style={{ marginLeft: '55px', color: '#10b981', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span>🧠</span> {insight}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }
+                        return <div key={idx} style={{ color: '#cbd5e1', fontSize: '0.9rem' }}>{rec}</div>;
+                    })}
+                </div>
+            );
+        }
+    }
+    return <span className="sf-geo-value" style={{ wordBreak: 'break-all' }}>{dataStr}</span>;
+};
+
 const SocialMapping = () => {
     const { user } = useAuth();
 
@@ -301,6 +383,22 @@ const SocialMapping = () => {
                         newEvents.push({ id: Date.now().toString() + 'lk' + c++, title: `Leak Indicator: ${leak.data}`, event_type: 'security', severity: 'high', timestamp: new Date().toISOString(), source: 'SpiderFoot' });
                     });
                 }
+                if (f.geoNetwork) {
+                    f.geoNetwork.forEach(geo => {
+                        const intelData = geo.data || geo.raw;
+                        if (intelData) {
+                            newEvents.push({ 
+                                id: Date.now().toString() + 'geo' + c++, 
+                                title: `DNS/Network Intel Discovered`, 
+                                event_type: 'infrastructure', 
+                                severity: 'info', 
+                                timestamp: new Date().toISOString(), 
+                                source: 'SpiderFoot',
+                                description: intelData 
+                            });
+                        }
+                    });
+                }
             }
 
             const localEvents = JSON.parse(localStorage.getItem(`st_events_${selectedInvestigation}`) || '[]');
@@ -376,7 +474,11 @@ const SocialMapping = () => {
 
         // Check for Email Breach
         if (target.includes('@') && target.includes('.')) {
-            checkBreaches(target.trim());
+            setScanMode('email');
+            await checkBreaches(target.trim());
+            setScanStatus('COMPLETE');
+            setLoading(false);
+            return;
         }
 
         if (isURL(target)) {
@@ -746,15 +848,12 @@ const SocialMapping = () => {
 
             {/* Breach Results (LeakCheck) */}
             {breachResults && (
-                <div className="sf-results breach-results" style={{ marginBottom: '20px', borderLeft: breachResults.success ? '4px solid #ef4444' : '4px solid #22c55e' }}>
-                    <div className="sf-results-header">
+                <div className="sf-results breach-results" style={{ marginBottom: '20px', borderLeft: breachResults.success ? '4px solid #ef4444' : '4px solid #22c55e', padding: '15px' }}>
+                    <div className="sf-results-header" style={{ marginBottom: '15px' }}>
                         <div>
-                            <h2>🔓 Credential Exposure Analysis</h2>
-                            <div className="sf-results-meta">
-                                Target: <strong>{target}</strong> |
-                                Status: <span className={`sf-status ${breachResults.success ? 'danger' : 'safe'}`}>
-                                    {breachResults.success ? 'COMPROMISED' : 'SAFE'}
-                                </span>
+                            <h2>{breachResults.success ? '🔓 Credential Exposure Analysis' : '✅ Credential Exposure Analysis'}</h2>
+                            <div className="sf-results-meta" style={{ marginTop: '5px' }}>
+                                Target: <strong>{target}</strong>
                             </div>
                         </div>
                         <div className="sf-results-actions">
@@ -768,29 +867,19 @@ const SocialMapping = () => {
                         </div>
                     </div>
 
-                    <div className="sf-stats" style={{ marginTop: '15px' }}>
-                        <div className={`sf-stat-card ${breachResults.success ? 'leak' : 'safe'}`}>
-                            <div className="sf-stat-value">{breachResults.sources ? breachResults.sources.length : 0}</div>
-                            <div className="sf-stat-label">Breaches Found</div>
+                    {!breachResults.success ? (
+                        <div style={{ textAlign: 'center', padding: '20px 0', color: '#22c55e', fontSize: '1.1rem' }}>
+                            ✅ No public breach records found for this email address.
                         </div>
-                        <div className="sf-stat-description" style={{ flex: 2, padding: '10px', color: '#cbd5e1' }}>
-                            {breachResults.success
-                                ? '⚠️ This email address was found in known data breaches. Passwords and personal data may be exposed.'
-                                : '✅ No public breach records found for this email address.'}
-                        </div>
-                    </div>
-
-                    {breachResults.sources && breachResults.sources.length > 0 && (
+                    ) : (
                         <div className="sf-findings">
-                            <div className="sf-category danger">
-                                <h3>⚠️ Known Leaks</h3>
-                                <div className="sf-items">
-                                    {breachResults.sources.map((source, i) => (
-                                        <div key={i} className="sf-item danger">
-                                            <span className="sf-item-type">Source</span>
-                                            <span className="sf-item-data">
+                            <div className="sf-category danger" style={{ border: 'none', background: 'transparent', padding: 0 }}>
+                                <h3 style={{ color: '#ef4444', marginBottom: '10px' }}>⚠️ Found in {breachResults.sources ? breachResults.sources.length : 0} Breach{breachResults.sources?.length !== 1 ? 'es' : ''}</h3>
+                                <div className="sf-items" style={{ gap: '8px' }}>
+                                    {breachResults.sources && breachResults.sources.map((source, i) => (
+                                        <div key={i} className="sf-item danger" style={{ padding: '8px 12px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '4px', color: '#fca5a5' }}>
+                                            <span style={{ fontWeight: 500 }}>
                                                 {typeof source === 'string' ? source : (source.name || JSON.stringify(source))}
-                                                {source.date ? ` (${source.date})` : ''}
                                             </span>
                                         </div>
                                     ))}
@@ -1065,7 +1154,7 @@ const SocialMapping = () => {
                                         {!item.city && !item.asn && !item.passiveDNS?.length && item.data && (
                                             <div className="sf-geo-row">
                                                 <span className="sf-geo-label">📋 Data</span>
-                                                <span className="sf-geo-value">{item.data}</span>
+                                                {renderDecodedData(item.data)}
                                             </div>
                                         )}
                                     </div>

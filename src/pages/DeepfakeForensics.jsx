@@ -82,7 +82,7 @@ const DeepfakeForensics = () => {
             const formData = new FormData();
             formData.append('file', file);
 
-            const response = await fetch('http://localhost:5000/api/deepfake-detect', {
+            const response = await fetch('http://localhost:8001/detect', {
                 method: 'POST',
                 body: formData,
             });
@@ -304,6 +304,161 @@ const DeepfakeForensics = () => {
                             </div>
                         </div>
                     )}
+
+                    {/* Metadata Forensics Panel */}
+                    {results.metadata_forensics && (
+                        <div className="result-card" style={{
+                            marginTop: '16px',
+                            borderColor: results.metadata_forensics.detected
+                                ? 'rgba(249,115,22,0.5)'
+                                : results.metadata_forensics.confidence === 'SUSPICIOUS'
+                                    ? 'rgba(234,179,8,0.4)'
+                                    : 'rgba(34,211,238,0.2)'
+                        }}>
+                            <h3>🔍 Metadata Forensics</h3>
+                            <div className="info-row" style={{ marginBottom: '8px' }}>
+                                <span style={{ fontWeight: 600 }}>
+                                    {results.metadata_forensics.warning}
+                                </span>
+                            </div>
+                            {results.metadata_forensics.generator && (
+                                <div className="info-row">
+                                    <span>Identified Generator</span>
+                                    <span style={{ color: '#f97316', fontWeight: 700 }}>
+                                        {results.metadata_forensics.generator}
+                                    </span>
+                                </div>
+                            )}
+                            <div className="info-row">
+                                <span>Metadata Confidence</span>
+                                <span style={{
+                                    color: results.metadata_forensics.confidence === 'CONFIRMED_AI'
+                                        ? '#f97316'
+                                        : results.metadata_forensics.confidence === 'SUSPICIOUS'
+                                            ? '#eab308'
+                                            : '#22d3ee',
+                                    fontWeight: 600
+                                }}>
+                                    {results.metadata_forensics.confidence}
+                                </span>
+                            </div>
+                            {results.metadata_forensics.signals?.length > 0 && (
+                                <div style={{ marginTop: '10px' }}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>Evidence Signals:</p>
+                                    {results.metadata_forensics.signals.map((sig, i) => (
+                                        <div key={i} style={{
+                                            fontSize: '0.72rem',
+                                            fontFamily: 'monospace',
+                                            color: 'rgba(6,182,212,0.8)',
+                                            background: 'rgba(6,182,212,0.05)',
+                                            padding: '4px 8px',
+                                            borderRadius: '4px',
+                                            marginBottom: '4px',
+                                            wordBreak: 'break-all'
+                                        }}>
+                                            {sig}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Attention Heatmap */}
+                    {results.heatmap && (
+                        <div className="result-card" style={{ marginTop: '16px' }}>
+                            <h3>🌡️ Attention Heatmap</h3>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                                Red regions = where the model detected manipulation artifacts
+                            </p>
+                            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                                <div style={{ flex: 1, minWidth: '200px' }}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>Original</p>
+                                    {file?.type.startsWith('image/') && (
+                                        <img src={preview} alt="Original" style={{
+                                            width: '100%', borderRadius: '8px',
+                                            border: '1px solid rgba(6,182,212,0.2)'
+                                        }} />
+                                    )}
+                                </div>
+                                <div style={{ flex: 1, minWidth: '200px' }}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>Forensic Attention Map</p>
+                                    <img
+                                        src={`data:image/jpeg;base64,${results.heatmap}`}
+                                        alt="Attention Heatmap"
+                                        style={{
+                                            width: '100%', borderRadius: '8px',
+                                            border: '1px solid rgba(249,115,22,0.3)'
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Frequency Spectrum Analysis */}
+                    {results.frequency_map && (
+                        <div className="result-card" style={{ marginTop: '16px' }}>
+                            <h3>📊 Frequency Spectrum Analysis</h3>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                2D FFT log-magnitude spectrum of the face crop — what the Frequency Stream analyzes
+                            </p>
+                            <p style={{ fontSize: '0.75rem', color: 'rgba(6,182,212,0.6)', marginBottom: '12px' }}>
+                                🔵 Centre = DC (low frequency) &nbsp;|&nbsp;
+                                🟡 Outer rings = high frequency detail &nbsp;|&nbsp;
+                                <span style={{ color: '#00ffff' }}>⊙ Cyan circles = anomalous GAN/diffusion artifact spikes</span>
+                            </p>
+                            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                                <div style={{ flex: 1, minWidth: '200px' }}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                                        Face Crop (MTCNN)
+                                    </p>
+                                    {file?.type.startsWith('image/') && (
+                                        <img src={preview} alt="Original" style={{
+                                            width: '100%', borderRadius: '8px',
+                                            border: '1px solid rgba(6,182,212,0.2)'
+                                        }} />
+                                    )}
+                                </div>
+                                <div style={{ flex: 1, minWidth: '200px' }}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                                        FFT Artifact Map
+                                        {results.fake_probability >= 45 && (
+                                            <span style={{
+                                                marginLeft: '8px', fontSize: '0.7rem',
+                                                color: '#f97316', fontWeight: 600
+                                            }}>
+                                                ⚠ Anomalous spikes detected
+                                            </span>
+                                        )}
+                                    </p>
+                                    <img
+                                        src={`data:image/jpeg;base64,${results.frequency_map}`}
+                                        alt="Frequency Spectrum"
+                                        style={{
+                                            width: '100%', borderRadius: '8px',
+                                            border: '1px solid rgba(99,102,241,0.4)',
+                                            imageRendering: 'pixelated'
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div style={{
+                                marginTop: '12px', padding: '8px 12px',
+                                background: 'rgba(99,102,241,0.08)',
+                                borderRadius: '6px', fontSize: '0.75rem',
+                                color: 'rgba(200,200,255,0.7)', lineHeight: 1.6
+                            }}>
+                                <strong style={{ color: 'rgba(200,200,255,0.9)' }}>How to read this:</strong> Real photographs follow a smooth
+                                1/f power law — energy fades gradually from centre outward with no isolated bright spots.
+                                GAN and diffusion models introduce periodic synthesis artifacts that appear as
+                                bright isolated clusters (circled in cyan) at specific spatial frequencies —
+                                the forensic signature our Frequency Stream was trained to detect.
+                            </div>
+                        </div>
+                    )}
+
+
 
                     <div className="preview-section" style={{ marginTop: '16px' }}>
                         <h3>Analyzed File</h3>
