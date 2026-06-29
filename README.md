@@ -1,69 +1,73 @@
-# 🕵️ Silent Trails — Profiling Human Patterns Across the Digitalverse
+# Silent Trails: Profiling Human Patterns Across the Digitalverse
 
-> **Final Year Project** — A full-stack OSINT & Digital Forensics Intelligence Platform that combines Open-Source Intelligence (OSINT) gathering, credential breach analysis, deepfake detection, and behavioural pattern analysis.
+> **Final Year Project** — A full-stack OSINT and Digital Forensics Intelligence Platform that combines Open-Source Intelligence (OSINT) gathering, credential breach analysis, deepfake detection, and behavioural pattern analysis.
 
----
-
-## 📌 Overview
+## Overview
 
 Silent Trails is a forensic intelligence platform designed to help investigators profile a digital subject by aggregating data from multiple intelligence sources. The system is composed of three major modules:
 
 | Module | Description |
 |--------|-------------|
-| **🔍 Digital Recon (OSINT)** | SpiderFoot-powered deep scanning of domains, IPs, URLs, and email breach lookups via LeakCheck |
-| **🤖 Deepfake Forensics** | Dual-engine deepfake detection using DINOv2 Three-Stream architecture + InceptionResnetV1 |
-| **📊 Investigation Timeline** | Persistent case management — save scan results to a structured investigation timeline |
+| **Digital Recon (OSINT)** | SpiderFoot-powered deep scanning of domains, IPs, URLs, and email breach lookups via LeakCheck |
+| **Deepfake Forensics** | Dual-engine deepfake detection using DINOv2 Three-Stream architecture + InceptionResnetV1 |
+| **Investigation Timeline** | Persistent case management — save scan results to a structured investigation timeline |
 
----
-
-## 🏗️ System Architecture
+## System Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                  React Frontend (Vite)               │
-│         Digital Recon │ Deepfake │ Timeline          │
-└───────────────────┬─────────────────────────────────┘
-                    │ REST API
-┌───────────────────▼─────────────────────────────────┐
-│              Node.js Backend (:5000)                 │
-│   SpiderFoot Proxy │ LeakCheck │ VirusTotal │ Auth   │
-└──────┬─────────────────────────────┬────────────────┘
-       │ Docker                      │ HTTP
-┌──────▼───────┐           ┌─────────▼───────────────┐
-│  SpiderFoot  │           │ Python Inference (:8001) │
-│  Container   │           │  DINOv2 + InceptionV1    │
-│   (:5001)    │           │  FastAPI + PyTorch        │
-└──────────────┘           └─────────────────────────┘
-                                        │
-                                ┌───────▼──────┐
-                                │   Supabase   │
-                                │  (Auth + DB) │
-                                └──────────────┘
+.───────────────────────────────────────────────────.
+|                  React Frontend (Vite)              |
+|         Digital Recon | Deepfake | Timeline         |
+.──────────────────────.──────────────────────────────.
+                       | REST API
+.──────────────────────v──────────────────────────────.
+|              Node.js Backend (:5000)                 |
+|   SpiderFoot Proxy | LeakCheck | VirusTotal | Auth   |
+.──────.──────────────────────────────.────────────────.
+       | Docker                       | HTTP
+.──────v───────.           .──────────v──────────────.
+|  SpiderFoot  |           | Python Inference (:8001) |
+|  Container   |           |  DINOv2 + InceptionV1    |
+|   (:5001)    |           |  FastAPI + PyTorch        |
+.──────────────.           .──────────────────────────.
+                                        |
+                                .───────v──────.
+                                |   Supabase   |
+                                |  (Auth + DB) |
+                                .──────────────.
 ```
 
----
-
-## 🤖 Deepfake Detection Model
+## Deepfake Detection Model
 
 ### Dual-Engine Fusion Architecture
 
 The forensics engine uses a **MAX-fusion** of two complementary detectors:
 
-**Engine 1 — InceptionResnetV1 (Face Swap Detector)**
+**Engine 1: InceptionResnetV1 (Face Swap Detector)**
 - Pre-trained on VGGFace2, fine-tuned for manipulation detection
-- Targets classical face-swap & GAN artifacts
+- Targets classical face-swap and GAN artifacts
 
-**Engine 2 — DINOv2 Three-Stream (AI Generation Detector)**
-- **Spatial Stream**: DINOv2-Base + LoRA adapters → 512-dim embedding
-- **Frequency Stream**: FFT log-magnitude spectrum → 4-layer CNN → 512-dim
-- **Attention Stream**: Cross-attention region queries (eyes/mouth/jaw/hair) → 512-dim + spatial heatmap
+**Engine 2: DINOv2 Three-Stream (AI Generation Detector)**
+- **Spatial Stream**: DINOv2-Base + LoRA adapters, outputs 512-dim embedding
+- **Frequency Stream**: FFT log-magnitude spectrum through a 4-layer CNN, outputs 512-dim
+- **Attention Stream**: Cross-attention region queries (eyes/mouth/jaw/hair), outputs 512-dim + spatial heatmap
 - **Adaptive Fusion**: Quality-aware weighted combination of all three streams
 
 ```
 Final Score = MAX(Engine1_Score, Engine2_Score)
 ```
 
-This means either engine can trigger a detection — catching both face swaps **and** AI-generated content.
+Either engine can trigger a detection, catching both face swaps **and** AI-generated content.
+
+### Training Datasets
+
+The model was trained across three datasets to maximize generalization:
+
+| Dataset | Description |
+|---------|-------------|
+| **FaceForensics++** | Large-scale benchmark with 4 manipulation types (Deepfakes, Face2Face, FaceSwap, NeuralTextures) |
+| **HIDF** | High-quality identity-diverse deepfake dataset |
+| **DeepDetect 2025** | Latest generation synthetic media including diffusion-model outputs |
 
 ### Model Performance
 
@@ -73,20 +77,17 @@ This means either engine can trigger a detection — catching both face swaps **
 | Val Accuracy | **99.7%** |
 | Precision | **99.6%** |
 | Recall | **99.8%** |
-| Dataset | FaceForensics++ (Stage 1) |
 
 ### Forensic Visualisations
 
-- **Attention Heatmap** — overlays WHERE the model detected manipulation on the face
-- **FFT Frequency Map** — shows anomalous GAN/diffusion artifact spikes in the frequency domain
+- **Attention Heatmap**: Overlays where the model detected manipulation on the face
+- **FFT Frequency Map**: Shows anomalous GAN/diffusion artifact spikes in the frequency domain
 
 | Confusion Matrix | ROC Curve |
 |:---:|:---:|
 | ![Confusion Matrix](validation_confusion_matrix.png) | ![ROC Curve](roc_curve_evaluation.png) |
 
----
-
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Frontend
 - **React 18** + **Vite**
@@ -107,13 +108,11 @@ This means either engine can trigger a detection — catching both face swaps **
 - **OpenCV** + **Pillow** (visualisation)
 
 ### Infrastructure
-- **Docker** — SpiderFoot OSINT engine
-- **Supabase** — authentication & database
-- **Google Colab Pro** — model training
+- **Docker**: SpiderFoot OSINT engine
+- **Supabase**: authentication and database
+- **Google Colab Pro**: model training
 
----
-
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -180,9 +179,9 @@ cd deepfake_model
 python -m src.inference.server
 ```
 
-> **Note:** The inference server requires a trained checkpoint (`.pth` file).  
-> Place it at: `deepfake_model/checkpoints/best_model.pth`  
-> The `resnetinceptionv1_epoch_32.pth` for Engine 1 must be placed in `deepfake_model/`.
+> **Note:** The inference server requires a trained checkpoint (`.pth` file).
+> Place it at: `deepfake_model/checkpoints/best_model.pth`
+> The `resnetinceptionv1_epoch_32.pth` for Engine 1 must also be placed in `deepfake_model/`.
 
 ### 8. Start the Frontend
 
@@ -192,9 +191,7 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173)
 
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 Silent-Trails/
@@ -221,7 +218,7 @@ Silent-Trails/
 │   │   ├── inference/
 │   │   │   └── server.py         # FastAPI inference server
 │   │   ├── training/             # Loss functions, metrics, trainer
-│   │   └── data/                 # Dataset & augmentation pipeline
+│   │   └── data/                 # Dataset and augmentation pipeline
 │   ├── notebooks/                # Google Colab training notebooks
 │   ├── configs/                  # Training hyperparameters (YAML)
 │   ├── train.py                  # Main training entry point
@@ -232,9 +229,7 @@ Silent-Trails/
 └── vite.config.js
 ```
 
----
-
-## 🎓 Academic Context
+## Academic Context
 
 This project was developed as a **Final Year Project (FYP)** at the undergraduate level.
 
@@ -246,19 +241,15 @@ This project was developed as a **Final Year Project (FYP)** at the undergraduat
 
 ### Limitations
 - Social media image compression (WhatsApp/Telegram) strips EXIF metadata and degrades frequency artifacts, reducing detection reliability for re-shared media
-- Model trained primarily on FaceForensics++ — may not generalize perfectly to newer diffusion-based generators without retraining
+- Training on multiple datasets improves generalization, but performance may vary on unseen diffusion-model outputs not represented in training
 
----
+## License
 
-## 📄 License
-
-This project is for **academic and educational purposes only**.  
+This project is for **academic and educational purposes only**.
 All third-party APIs and tools are used under their respective licences.
 
----
+## Author
 
-## 👤 Author
-
-**Faheem Raza**  
-Final Year CS Student  
+**Faheem Raza**
+Final Year CS Student
 GitHub: [@rzfaheem](https://github.com/rzfaheem)
